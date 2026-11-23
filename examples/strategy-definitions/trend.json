@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "name": "My trend strategy",
+  "description": "Research template; saving does not activate trading.",
+  "parameters": {
+    "adx_range": 20,
+    "min_iv_rank": 30,
+    "min_iv_rv_ratio": 1.1,
+    "max_cheap_iv_rv_ratio": 1.0,
+    "spread_width": 100,
+    "risk_pct": 2.0,
+    "max_lots": 5,
+    "rsi_min": 0.0,
+    "rsi_max": 100.0,
+    "entry_start": "09:45",
+    "entry_end": "14:30"
+  },
+  "rules": [
+    {
+      "market": "rising",
+      "volatility": "rich",
+      "strategy": "bull_put_spread"
+    },
+    {
+      "market": "rising",
+      "volatility": "cheap",
+      "strategy": "bull_call_spread"
+    },
+    {
+      "market": "falling",
+      "volatility": "rich",
+      "strategy": "bear_call_spread"
+    },
+    {
+      "market": "falling",
+      "volatility": "cheap",
+      "strategy": "bear_put_spread"
+    }
+  ]
+}

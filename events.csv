@@ -1,0 +1,16 @@
+# Scheduled market-moving events. Add RBI policy dates, US Fed days, etc.
+# The bot buys a straddle (or stays flat if IV is already high) in any week
+# that contains one of these dates.
+date,event
+2019-02-01,Interim Union Budget
+2019-05-23,Lok Sabha election results
+2019-07-05,Union Budget
+2020-02-01,Union Budget
+2021-02-01,Union Budget
+2022-02-01,Union Budget
+2023-02-01,Union Budget
+2024-02-01,Interim Union Budget
+2024-06-04,Lok Sabha election results
+2024-07-23,Union Budget
+2025-02-01,Union Budget
+2026-02-01,Union Budget

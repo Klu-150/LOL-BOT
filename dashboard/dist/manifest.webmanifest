@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Last of Our League",
+  "short_name": "Our League",
+  "description": "Options paper-trading dashboard, strategy decisions and virtual order history.",
+  "start_url": "/?app=1#terminal",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f5f7",
+  "theme_color": "#f3f5f7",
+  "icons": [
+    {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "/icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Paper orders", "url": "/#orders"},
+    {"name": "Engine activity", "url": "/#terminal/activity"}
+  ]
+}

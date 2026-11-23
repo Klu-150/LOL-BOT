@@ -1,0 +1,10 @@
+[Unit]
+Description=Evaluate the research-only Nifty volatility model after the session
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 16:00:00 Asia/Kolkata
+Persistent=false
+Unit=league-volatility-shadow.service
+
+[Install]
+WantedBy=timers.target

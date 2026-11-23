@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "file": "assets/app-dc64357f60e3c041.js",
+      "bytes": 70901,
+      "sha256": "dc64357f60e3c041b3f4aab616e57747b92856fc10e0efb17ad17c27341ea79b"
+    },
+    {
+      "file": "assets/execution-view-f1b717ac6ba642f9.js",
+      "bytes": 9244,
+      "sha256": "f1b717ac6ba642f92666cde5534626fbec2d5e076709d1928f174833185fa762"
+    },
+    {
+      "file": "assets/mobile-app-ff46d89149c30098.js",
+      "bytes": 7396,
+      "sha256": "ff46d89149c300986681f60dc0d7c26cfb602e6e6bc0afa6f454a542cf601dbc"
+    },
+    {
+      "file": "assets/platform-model-f1eba76098ddd6f0.js",
+      "bytes": 8961,
+      "sha256": "f1eba76098ddd6f02f20423e54fe672298eedf36460f97d6b0c99fdcaaa495c5"
+    },
+    {
+      "file": "assets/platform-store-b1941202ed9a9670.js",
+      "bytes": 5898,
+      "sha256": "b1941202ed9a96708e812f99d9c1f157c689a764c4f1410e26864c709b5d402e"
+    },
+    {
+      "file": "assets/privacy-center-ef740234da1be8ac.js",
+      "bytes": 13467,
+      "sha256": "ef740234da1be8ac5b1bf5e2cafda333531e438a9e6a16bd44ec331846f310ed"
+    },
+    {
+      "file": "assets/strategy-engine-251c64dd6c468073.js",
+      "bytes": 14272,
+      "sha256": "251c64dd6c46807396a891bdd07bdcb8a9ff3366f575ee55a2e2756082d78536"
+    },
+    {
+      "file": "assets/strategy-worker-a5e6da50ba58ce26.js",
+      "bytes": 260,
+      "sha256": "a5e6da50ba58ce265e87d285564136bad8ec06a4e683a4c041fef9a89d8af59a"
+    },
+    {
+      "file": "assets/strategy-workshop-8378ca6fa22333db.js",
+      "bytes": 22375,
+      "sha256": "8378ca6fa22333dba0788aa68cc01aba4fcc44c6dccb509bd0764f1b50973685"
+    },
+    {
+      "file": "assets/styles-50e6b4a4eb2c1a65.css",
+      "bytes": 110531,
+      "sha256": "50e6b4a4eb2c1a653b940fde15e4abad745010b5263a7f89ac52958faef1dae8"
+    },
+    {
+      "file": "assets/terminal-41fdf28093f9a999.js",
+      "bytes": 17930,
+      "sha256": "41fdf28093f9a99924eb7c378af6a424b80fab4859426bbccc75bc7322389245"
+    },
+    {
+      "file": "assets/terminal-api-954788358d3cf4e2.js",
+      "bytes": 2649,
+      "sha256": "954788358d3cf4e2f255bd67f8a06019ae69cf112b2612cf44cac10f13d5576b"
+    },
+    {
+      "file": "assets/theme-132cccc706771f04.js",
+      "bytes": 929,
+      "sha256": "132cccc706771f041cd439ea379cce93b724b73d0b02911130b7c390559b78fb"
+    },
+    {
+      "file": "assets/trading-tools-c832e834da67bbeb.js",
+      "bytes": 25621,
+      "sha256": "c832e834da67bbebfddadcaa8950828b1bef4d6a5c657ca98291b56b345fa80f"
+    },
+    {
+      "file": "data.json",
+      "bytes": 754971,
+      "sha256": "7b7ea8b0ba2dac7fdfd3717d25ac2f400fadddbad7f2bba276bdc74563ccb583"
+    },
+    {
+      "file": "icons/apple-touch-icon.png",
+      "bytes": 3332,
+      "sha256": "f778fa8bd8a81fa0178bad0b7fac7b75fd3a097490ed13bbee459e11b2523973"
+    },
+    {
+      "file": "icons/icon-192.png",
+      "bytes": 3663,
+      "sha256": "0ba5028a4df58ce6b5e1911f6ff3147323e0c4598548ea89fe098b6008bf91ce"
+    },
+    {
+      "file": "icons/icon-512.png",
+      "bytes": 8861,
+      "sha256": "86297a814f948ca60b7491f661cf5ff61a80d2c4c02cb335bfc8c1c65c5a6215"
+    },
+    {
+      "file": "icons/icon-maskable.png",
+      "bytes": 8861,
+      "sha256": "86297a814f948ca60b7491f661cf5ff61a80d2c4c02cb335bfc8c1c65c5a6215"
+    },
+    {
+      "file": "index.html",
+      "bytes": 1518,
+      "sha256": "21b8f6cabb1c67de048edb12abe72bea748d98f6d5e496a002521d068af10dee"
+    },
+    {
+      "file": "manifest.webmanifest",
+      "bytes": 725,
+      "sha256": "69b8e9ab20afd3a875d66a89d772fb10ba30c64cdb1b2a1e1e2df75158f03b52"
+    },
+    {
+      "file": "offline.html",
+      "bytes": 1070,
+      "sha256": "d0295d88fec54177995d2924a18d10ac1a0e9e5813aa2e9003e10b41c739668d"
+    },
+    {
+      "file": "platform-config.json",
+      "bytes": 829,
+      "sha256": "4d48116404865104317bb7660be25b5817b605d0777d48f4f822ce1272712a21"
+    },
+    {
+      "file": "privacy.html",
+      "bytes": 876,
+      "sha256": "306de8b9ce11ace98f45c13a94228a89e96a3f881d7634c1c4b8cc6cae68551c"
+    },
+    {
+      "file": "strategy-data.json",
+      "bytes": 2510368,
+      "sha256": "a348aca4a73c1ea82209e1ed46aa51e5715706e82ba33a077a5530681daf8b7a"
+    },
+    {
+      "file": "sw.js",
+      "bytes": 1670,
+      "sha256": "6572ecfcda0cf345b6efcf9baa0b601065c949f228077bd73b4742a39dbc5e16"
+    },
+    {
+      "file": "third-party-notices.txt",
+      "bytes": 450950,
+      "sha256": "d19cb7337a515838505de8b9e6744623e36441d42856e9d8c62d402356b7be9c"
+    }
+  ],
+  "total_bytes": 4058128,
+  "checks": {
+    "allowlist": true,
+    "symlinks_rejected": true,
+    "asset_hashes": true,
+    "source_maps_absent": true,
+    "known_credential_values_checked": 0,
+    "credential_patterns": true,
+    "local_module_links": true
+  },
+  "limitations": "Pattern scanning is not proof of absence of secrets. Browser code and research rules remain readable and copyable."
+}

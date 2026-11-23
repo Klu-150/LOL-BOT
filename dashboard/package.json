@@ -1,0 +1,1 @@
+{"name":"last-of-our-league-terminal","private":true,"type":"module","scripts":{"build":"node build-release.mjs","check:release":"node release-checks.mjs"}}

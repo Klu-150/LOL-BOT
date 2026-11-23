@@ -1,0 +1,11 @@
+.venv
+**/.git
+**/__pycache__
+**/.pytest_cache
+**/.env*
+paper
+**/*credentials*
+.aws
+.codex
+.agents
+tests

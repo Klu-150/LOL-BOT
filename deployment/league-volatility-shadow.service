@@ -1,0 +1,10 @@
+[Unit]
+Description=Offline daily Nifty volatility research (no trading controls)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker run --rm --network none --read-only --user 10001 --memory 256m --cpus 0.5 --pids-limit 32 --security-opt no-new-privileges:true --tmpfs /tmp:rw,nosuid,nodev,size=16m -e OPENBLAS_NUM_THREADS=1 -e OMP_NUM_THREADS=1 -v /srv/league/state/data/intraday_nifty.csv:/research/input.csv:ro -v /srv/league/state/results/research:/research/output:rw --entrypoint python league-engine:current -m research.indian_volatility --data /research/input.csv --output /research/output/volatility-shadow.json
+TimeoutStartSec=180
+NoNewPrivileges=true
+PrivateTmp=true

@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly League off-host recovery snapshots
+
+[Timer]
+OnCalendar=*-*-* *:10:00
+RandomizedDelaySec=30
+Persistent=true
+Unit=league-offhost-backup.service
+
+[Install]
+WantedBy=timers.target

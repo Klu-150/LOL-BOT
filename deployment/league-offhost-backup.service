@@ -1,0 +1,11 @@
+[Unit]
+Description=Verified private off-host backup of League paper snapshots
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec --user 10001 league-engine-1 python /app/offhost_backup.py --account leaguebackupdedf75 --state /state/paper
+TimeoutStartSec=300
+NoNewPrivileges=true
+PrivateTmp=true

@@ -1,0 +1,20 @@
+# Paid reference only. The user's current requirement is free hosting.
+services:
+  - type: web
+    name: last-of-our-league-engine
+    runtime: docker
+    plan: starter
+    numInstances: 1
+    autoDeployTrigger: "off"
+    healthCheckPath: /healthz
+    disk:
+      name: paper-account
+      mountPath: /state
+      sizeGB: 1
+    envVars:
+      - key: LEAGUE_USERS_JSON
+        sync: false
+      - key: LEAGUE_ORIGINS
+        value: https://nifty-research-terminal.nearbydrape.chatgpt.site
+      - key: LEAGUE_AUTO_START
+        value: "false"

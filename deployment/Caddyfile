@@ -1,0 +1,17 @@
+{$LEAGUE_DOMAIN} {
+    encode zstd gzip
+    request_body {
+        max_size 2KB
+    }
+    reverse_proxy engine:8765 {
+        header_up X-League-Client-IP {remote_host}
+        transport http {
+            dial_timeout 5s
+            response_header_timeout 30s
+        }
+    }
+    header X-Content-Type-Options nosniff
+    header Strict-Transport-Security "max-age=31536000"
+    header X-Frame-Options DENY
+    header Referrer-Policy no-referrer
+}

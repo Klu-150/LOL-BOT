@@ -1,0 +1,38 @@
+name: Paper engine checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip==26.3
+      - run: python -m pip install --require-hashes -r requirements-cloud.lock
+      - run: python -m pytest -q
+      - run: |
+          node dashboard/checks.mjs
+          node dashboard/render-checks.mjs
+          node dashboard/control-checks.mjs
+          node dashboard/execution-checks.mjs
+          node dashboard/public-checks.mjs
+          node dashboard/mobile-checks.mjs
+          node dashboard/strategy-checks.mjs
+          node dashboard/platform-checks.mjs
+          node dashboard/interaction-checks.mjs
+          node dashboard/privacy-checks.mjs
+          node dashboard/build-release.mjs
+          node dashboard/release-checks.mjs
+      - run: python -m pip install pip-audit==2.10.1
+      - run: pip-audit --disable-pip --no-deps -r requirements-cloud.lock
+      - run: python -m pip download --only-binary=:all: --require-hashes -r requirements-bootstrap.lock -r requirements-cloud.lock -d deployment/wheelhouse
+      - run: docker build -t league-verify .

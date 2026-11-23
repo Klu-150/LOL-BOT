@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {CloudApi,serverOrigin,mobilePage,mobileNav} from './dist/mobile-app.js';
+import {terminal} from './dist/terminal.js';
+import {executionView} from './dist/execution-view.js';
+assert.equal(serverOrigin('https://engine.example/'),'https://engine.example');
+for(const value of ['http://engine.example','https://user:secret@engine.example','https://engine.example/?key=bad','https://engine.example/private','javascript:alert(1)'])assert.throws(()=>serverOrigin(value));
+const key='fake-test-key-not-a-real-secret-123456789';
+const calls=[];
+const api=new CloudApi('https://engine.example','owner',key,async(url,options)=>{
+ calls.push([url,options]);
+ return {ok:true,json:async()=>url.endsWith('/health')?{status:'ok',mode:'paper',execution:'cloud',capabilities:{idempotency:true},permissions:{control:true},user:{name:'owner',role:'trader'},automation:{enabled:false}}:{enabled:true}};
+});
+assert.equal((await api.action('/api/automation/start')).enabled,true);
+assert.equal(calls.length,2);
+assert.equal(calls[1][0],'https://engine.example/api/automation/start');
+assert.equal(calls[1][1].headers.Authorization,'Bearer owner.'+key);
+assert.equal(calls[1][1].credentials,'omit');
+assert.equal(calls[1][1].redirect,'error');
+assert.match(calls[1][1].headers['Idempotency-Key'],/^[0-9a-f-]{36}$/);
+const firstKey=calls[1][1].headers['Idempotency-Key'];await api.action('/api/automation/pause');assert.notEqual(calls.at(-1)[1].headers['Idempotency-Key'],firstKey);
+assert.ok(!Object.hasOwn(calls[1][1].headers,'X-Terminal-Token'));
+assert.equal(api.permissions.control,true);
+await assert.rejects(api.read('/other'),/not responding/);
+const viewer=new CloudApi('https://engine.example','friend',key,async url=>url.endsWith('/health')?{ok:true,json:async()=>({status:'ok',mode:'paper',execution:'cloud',permissions:{control:false},user:{name:'friend',role:'viewer'},automation:{enabled:true}})}:{ok:false,status:403,json:async()=>({error:'View only'})});
+await viewer.connect();assert.equal(viewer.permissions.control,false);
+await assert.rejects(viewer.action('/api/automation/start'),/View only/);
+const data=JSON.parse(fs.readFileSync(new URL('./dist/data.json',import.meta.url)));
+const helpers={e:x=>String(x??''),human:x=>String(x??''),num:x=>String(x??''),date:x=>String(x??''),icon:()=>'',money:x=>String(x??''),pct:x=>String(x??''),chart:()=>''};
+let html=mobilePage({...helpers,sourceMode:'snapshot',cloudSession:null,api,installed:false});
+for(const text of ['Safari','Add to Home Screen','Open as Web App','Cloud engine not connected','always-on server','type="password"'])assert.ok(html.includes(text),text);
+assert.ok(!html.includes(key));
+assert.ok(mobileNav({view:'terminal',bookTab:'activity'},()=> '').includes('Mobile navigation'));
+html=terminal({...helpers,snapshot:data,state:{bookTab:'positions'},sourceMode:'cloud',automation:{enabled:true,state:'watching'},controlAllowed:false});
+assert.ok(html.includes('Auto paper enabled'));
+assert.ok(html.includes('data-action="auto-start" disabled'));
+const now=Date.parse('2026-11-16T10:52:00+05:30');
+const s={paper:{decisions:[{timestamp:'2026-11-16T10:50:00+05:30',action:'skip',reason:'waiting_for_5m_bullish_trigger'}]},intraday:{latest_bar:'2026-11-16T10:50:00+05:30',candidate:'bull_put_spread'}};
+assert.equal(executionView(s,{enabled:true},'cloud',now).title,'Waiting for entry trigger');
+assert.equal(executionView(s,{},'cloud-disconnected',now).title,'Paper engine disconnected');
+const manifest=JSON.parse(fs.readFileSync(new URL('./dist/manifest.webmanifest',import.meta.url)));
+assert.equal(manifest.display,'standalone');
+for(const icon of manifest.icons)assert.ok(fs.existsSync(new URL('./dist'+icon.src,import.meta.url)));
+const handlers={};let responseCalled=false;
+vm.runInNewContext(fs.readFileSync(new URL('./dist/sw.js',import.meta.url),'utf8'),{self:{location:{origin:'https://app.example'},addEventListener:(name,fn)=>handlers[name]=fn},URL});
+for(const [path,method,authorization] of [['/api/health','GET',false],['/data.json','GET',false],['/api/automation/start','POST',true],['/assets/test.js','GET',true]]){
+ handlers.fetch({request:{url:'https://app.example'+path,method,headers:{has:()=>authorization}},respondWith:()=>{responseCalled=true}});
+ assert.equal(responseCalled,false,'Sensitive data and actions must bypass offline caching');
+}
+console.log('Mobile app passed HTTPS/key handling, viewer permissions, cloud execution states, iPhone install metadata and no-cache checks for account data/actions.');
+
+const legacyCalls=[];const legacy=new CloudApi('https://engine.example','owner',key,async(url,options)=>{legacyCalls.push(options);return {ok:true,json:async()=>url.endsWith('/health')?{status:'ok',mode:'paper',execution:'cloud',permissions:{control:true}}:{enabled:true}};});
+await legacy.action('/api/automation/start');assert.ok(!Object.hasOwn(legacyCalls[1].headers,'Idempotency-Key'),'Older engines must remain CORS compatible');

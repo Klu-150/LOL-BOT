@@ -1,0 +1,245 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "indiasouthcentral"
+    },
+    "alertEmail": {
+      "type": "secureString"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "leaguebackupdedf75",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "tags": {
+        "purpose": "league-paper-recovery"
+      },
+      "properties": {
+        "accessTier": "Hot",
+        "minimumTlsVersion": "TLS1_2",
+        "supportsHttpsTrafficOnly": true,
+        "allowBlobPublicAccess": false,
+        "allowSharedKeyAccess": false,
+        "defaultToOAuthAuthentication": true,
+        "allowCrossTenantReplication": false
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-05-01",
+      "name": "leaguebackupdedf75/default",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', 'leaguebackupdedf75')]"
+      ],
+      "properties": {
+        "isVersioningEnabled": true,
+        "deleteRetentionPolicy": {
+          "enabled": true,
+          "days": 7,
+          "allowPermanentDelete": false
+        },
+        "containerDeleteRetentionPolicy": {
+          "enabled": true,
+          "days": 7
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-05-01",
+      "name": "leaguebackupdedf75/default/paper-recovery",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', 'leaguebackupdedf75', 'default')]"
+      ],
+      "properties": {
+        "publicAccess": "None"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/managementPolicies",
+      "apiVersion": "2023-05-01",
+      "name": "leaguebackupdedf75/default",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', 'leaguebackupdedf75')]"
+      ],
+      "properties": {
+        "policy": {
+          "rules": [
+            {
+              "enabled": true,
+              "name": "seven-day-recovery",
+              "type": "Lifecycle",
+              "definition": {
+                "filters": {
+                  "blobTypes": [
+                    "blockBlob"
+                  ],
+                  "prefixMatch": [
+                    "paper-recovery/accounts/"
+                  ]
+                },
+                "actions": {
+                  "baseBlob": {
+                    "delete": {
+                      "daysAfterModificationGreaterThan": 7
+                    }
+                  },
+                  "version": {
+                    "delete": {
+                      "daysAfterCreationGreaterThan": 7
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "league-ops-logs",
+      "location": "[parameters('location')]",
+      "tags": {
+        "purpose": "league-paper-recovery"
+      },
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30,
+        "workspaceCapping": {
+          "dailyQuotaGb": 0.023
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "league-paper-monitor",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "tags": {
+        "purpose": "league-paper-recovery"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', 'league-ops-logs')]"
+      ],
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', 'league-ops-logs')]",
+        "DisableLocalAuth": true,
+        "RetentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.Insights/actionGroups",
+      "apiVersion": "2023-01-01",
+      "name": "league-paper-email",
+      "location": "global",
+      "properties": {
+        "groupShortName": "LeaguePaper",
+        "enabled": true,
+        "emailReceivers": [
+          {
+            "name": "Owner",
+            "emailAddress": "[parameters('alertEmail')]",
+            "useCommonAlertSchema": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/webtests",
+      "apiVersion": "2015-05-01",
+      "name": "league-paper-readiness",
+      "location": "[parameters('location')]",
+      "kind": "ping",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/components', 'league-paper-monitor')]"
+      ],
+      "tags": {
+        "[concat('hidden-link:', resourceId('Microsoft.Insights/components', 'league-paper-monitor'))]": "Resource"
+      },
+      "properties": {
+        "Name": "League paper readiness",
+        "SyntheticMonitorId": "league-paper-readiness",
+        "Kind": "ping",
+        "Frequency": 300,
+        "Enabled": true,
+        "Timeout": 30,
+        "RetryEnabled": true,
+        "Description": "Paper readiness only; no private account details.",
+        "Locations": [
+          {
+            "Id": "apac-hk-hkn-azr"
+          },
+          {
+            "Id": "apac-sg-sin-azr"
+          },
+          {
+            "Id": "emea-nl-ams-azr"
+          },
+          {
+            "Id": "emea-gb-db3-azr"
+          },
+          {
+            "Id": "us-va-ash-azr"
+          }
+        ],
+        "Configuration": {
+          "WebTest": "<WebTest Name=\"League paper readiness\" Id=\"4fea4670-cfa1-55e9-87a3-db7cfd8ad585\" Enabled=\"True\" CssProjectStructure=\"\" CssIteration=\"\" Timeout=\"30\" WorkItemIds=\"\" xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\"><Items><Request Method=\"GET\" Version=\"1.1\" Url=\"https://last-of-our-league-dedf75.indiasouthcentral.cloudapp.azure.com/readyz\" ThinkTime=\"0\" Timeout=\"30\" ParseDependentRequests=\"False\" FollowRedirects=\"False\" RecordResult=\"True\" Cache=\"False\" ResponseTimeGoal=\"0\" Encoding=\"utf-8\" ExpectedHttpStatusCode=\"200\" ExpectedResponseUrl=\"\" ReportingName=\"\" IgnoreHttpStatusCode=\"False\" /></Items></WebTest>"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Insights/metricAlerts",
+      "apiVersion": "2018-03-01",
+      "name": "league-paper-unavailable",
+      "location": "global",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/webtests', 'league-paper-readiness')]",
+        "[resourceId('Microsoft.Insights/actionGroups', 'league-paper-email')]"
+      ],
+      "properties": {
+        "description": "Last of Our League paper engine is unavailable or not ready. No broker orders are enabled.",
+        "severity": 1,
+        "enabled": true,
+        "evaluationFrequency": "PT1M",
+        "windowSize": "PT5M",
+        "autoMitigate": true,
+        "scopes": [
+          "[resourceId('Microsoft.Insights/webtests', 'league-paper-readiness')]",
+          "[resourceId('Microsoft.Insights/components', 'league-paper-monitor')]"
+        ],
+        "criteria": {
+          "odata.type": "Microsoft.Azure.Monitor.WebtestLocationAvailabilityCriteria",
+          "webTestId": "[resourceId('Microsoft.Insights/webtests', 'league-paper-readiness')]",
+          "componentId": "[resourceId('Microsoft.Insights/components', 'league-paper-monitor')]",
+          "failedLocationCount": 3
+        },
+        "actions": [
+          {
+            "actionGroupId": "[resourceId('Microsoft.Insights/actionGroups', 'league-paper-email')]"
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "storageName": {
+      "type": "string",
+      "value": "leaguebackupdedf75"
+    }
+  }
+}
