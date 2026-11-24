@@ -40,3 +40,6 @@ def test_absent_invalid_or_failed_scan_never_passes(tmp_path):
     with pytest.raises(ValueError,match='Invalid'):evaluate(tmp_path)
     report(tmp_path,successful=False)
     with pytest.raises(ValueError,match='did not complete'):evaluate(tmp_path)
+    report(tmp_path,score='NaN')
+    report(tmp_path,[{'ruleId':'py/test-finding'}],score='NaN')
+    with pytest.raises(ValueError,match='Invalid security severity'):evaluate(tmp_path)

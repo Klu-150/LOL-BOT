@@ -1,6 +1,7 @@
 """Fail CI on actionable CodeQL SARIF findings, not just scanner failures."""
 import argparse
 import json
+import math
 from pathlib import Path
 
 
@@ -27,6 +28,8 @@ def evaluate(directory):
                 level=result.get('level',rule.get('defaultConfiguration',{}).get('level','warning'))
                 try:score=float(rule.get('properties',{}).get('security-severity',0))
                 except (TypeError,ValueError):raise ValueError('Invalid security severity') from None
+                if not math.isfinite(score) or not 0<=score<=10:
+                    raise ValueError('Invalid security severity')
                 location=(result.get('locations') or [{}])[0].get('physicalLocation',{})
                 findings.append({'rule':result.get('ruleId','unknown'),'level':level,'security_severity':score,
                     'path':location.get('artifactLocation',{}).get('uri'),
