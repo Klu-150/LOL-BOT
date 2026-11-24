@@ -28,7 +28,7 @@ from operations import BackupManager, OperationsStore, RateLimiter, SnapshotCach
 from feed_transport import transport
 from offhost_backup import status as offhost_status
 
-VERSION = '1.2.1'
+VERSION = '1.2.2'
 LOG = logging.getLogger(__name__)
 
 
@@ -106,7 +106,7 @@ class CloudApp:
             issues.append('worker_not_running')
         if age is None or age > max(180, 3 * status.get('poll_seconds', 60)):
             issues.append('heartbeat_stale')
-        if status.get('state') in ('error', 'data_error', 'awaiting_data', 'square_off_waiting_for_data', 'stopped', 'migrated_to_cloud', 'shutdown_waiting', 'storage_guard'):
+        if status.get('state') in ('error', 'data_error', 'awaiting_data', 'square_off_waiting_for_data', 'stopped', 'migrated_to_cloud', 'shutdown_waiting', 'storage_guard', 'calendar_unverified'):
             issues.append(status['state'])
         if status.get('state') == 'awaiting_fresh_market_data':
             issues.append('market_data_stale')

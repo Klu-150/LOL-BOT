@@ -12,6 +12,7 @@ import config as C
 from data import ROOT
 import intraday_feed as feed
 import intraday_paper as paper
+from exchange_calendar import session_status
 
 STATUS_FILE = ROOT / "paper" / "intraday_runtime.json"
 MIGRATION_FILE = ROOT / "paper" / "cloud_migration.json"
@@ -63,8 +64,8 @@ class AutoTrader:
             if migration:
                 return self._migrated_status(migration)
             now = now or datetime.now(ZoneInfo("Asia/Kolkata"))
-            stamp = now.strftime("%H:%M")
-            session_window = now.weekday() < 5 and "09:15" <= stamp <= "15:40"
+            calendar = session_status(now)
+            session_window = calendar['feed_window']
             source = None
             if refresh and session_window:
                 try:
@@ -76,24 +77,27 @@ class AutoTrader:
                             paper.process(self.db, now=now, entries_enabled=False)
                     except Exception:
                         pass
-                    return self._write({"state": "data_error", "error": str(exc)})
+                    return self._write({"state": "data_error", "error": str(exc), "calendar": calendar})
             if not (ROOT / C.INTRADAY_CSV).exists():
-                return self._write({"state": "awaiting_data", "message": "Refresh the intraday feed or supply timestamped 5m CSV bars"})
+                return self._write({"state": "awaiting_data", "message": "Refresh the intraday feed or supply timestamped 5m CSV bars", "calendar": calendar})
             if self._stop.is_set():
                 return self.status
             storage_ok = shutil.disk_usage(self.db.parent).free >= 1024 ** 3
             with self._entry_lock:
                 result = paper.process(self.db, now=now,
-                                       entries_enabled=self.entries_enabled and storage_ok and not self._stop.is_set())
+                                       entries_enabled=self.entries_enabled and storage_ok and calendar['entries_allowed'] and not self._stop.is_set())
             result["state"] = result.pop("status")
             if not storage_ok:
                 result.update(state='storage_guard', message='Low disk space blocks new entries; existing exits remain managed')
-            if not session_window and result["state"] == "awaiting_fresh_market_data":
-                result["state"] = "market_closed"
+            if not calendar['verified']:
+                result['state'] = 'calendar_unverified'
+            elif not session_window and result["state"] == "awaiting_fresh_market_data":
+                result["state"] = 'square_off_waiting_for_data' if result.get('position_open') else 'market_closed'
             if not self.entries_enabled and result["state"] == "watching":
                 result["state"] = "entries_paused_managing_exits"
             if source:
                 result["feed"] = source
+            result['calendar'] = calendar
             return self._write(result)
         except Exception as exc:
             return self._write({"state": "error", "error": str(exc)})

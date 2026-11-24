@@ -24,7 +24,7 @@ sys.path.insert(0,str(ROOT))
 import intraday_paper as P
 import ledger_store as L
 from operations import backup_database
-from tools.capacity_fixture import TEST_KEY
+from tools.capacity_fixture import TEST_KEY, synthetic_closed_trade
 
 
 def main():
@@ -37,11 +37,17 @@ def main():
     if not 1<=args.trades<=1000000:parser.error('Use 1..1,000,000 synthetic trades')
     with tempfile.TemporaryDirectory(prefix='league-capacity-') as temporary:
         root=Path(temporary);(root/'BENCHMARK_ONLY').touch();(root/'paper').mkdir()
-        for name in ('data','results'):shutil.copytree(ROOT/name,root/name,ignore=shutil.ignore_patterns('capacity*.json','dependency-audit*.json'))
+        # Only public price inputs and a fresh synthetic report enter the fixture.
+        (root/'data').mkdir();(root/'results').mkdir()
+        for name in (P.C.NIFTY_CSV,P.C.VIX_CSV,P.C.INTRADAY_CSV):
+            source=ROOT/name
+            if source.is_file():shutil.copy2(source,root/'data'/source.name)
+        (root/'results/results.json').write_text(json.dumps({'label':'Synthetic capacity fixture',
+            'summary':[{'strategy':'FIXTURE','total_rs':0,'trades':0}],
+            'equity':{'FIXTURE':[['2026-11-16',0]]}}))
         shutil.copy2(ROOT/'TRADING_PLAN.md',root/'TRADING_PLAN.md')
         db=root/'paper/intraday_500k.sqlite3';P.initialise(db,now=datetime.now(timezone.utc))
-        with sqlite3.connect(P.DEFAULT_DB.resolve().as_uri()+'?mode=ro',uri=True) as original:
-            sample=json.loads(original.execute('SELECT body FROM trades LIMIT 1').fetchone()[0])
+        sample=synthetic_closed_trade()
         base=datetime(2020,1,1,tzinfo=timezone.utc)
         def rows():
             for number in range(args.trades):

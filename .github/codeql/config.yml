@@ -1,0 +1,6 @@
+name: League application security
+queries:
+  - uses: security-extended
+paths-ignore:
+  - dashboard/build/**
+  - dashboard/dist/assets/**

@@ -1,0 +1,40 @@
+{
+  "version": "1.2.2",
+  "verified_on": "2026-11-24",
+  "scope": "controlled single-account automatic paper trading",
+  "deployed": true,
+  "public_readiness_http_status": 200,
+  "engine_state": "market_closed",
+  "calendar_reason": "verified_exchange_holiday",
+  "source_archive_sha256": "54c1124626678b32868dc2d98a0a72538270985c5a3989515a6473af86067148",
+  "local_python_tests_passed": 161,
+  "isolated_linux_python_tests_passed": 158,
+  "browser_parity_tests_verified_locally": 3,
+  "account_preserved_exactly": true,
+  "ledger_integrity_verified": true,
+  "pinned_pricing_and_risk_fingerprint_preserved": true,
+  "https_authentication_cors_viewer_restrictions_verified": true,
+  "broker_execution": false,
+  "synthetic_capacity": {
+    "stored_trades": 100500,
+    "stored_events": 100000,
+    "clients": 16,
+    "requests": 1600,
+    "errors": 0,
+    "p95_ms": 18.49,
+    "backup_restore_verified": true,
+    "scope": "local synthetic fixture; excludes VM/WAN/TLS/broker throughput"
+  },
+  "calendar_coverage_end": "2026-12-31",
+  "calendar_sources": [
+    "https://nsearchives.nseindia.com/content/circulars/FAOP71777.pdf",
+    "https://nsearchives.nseindia.com/content/circulars/FAOP72262.pdf"
+  ],
+  "security_analysis": "CodeQL is configured for Python and JavaScript on pushes and pull requests; inspect live findings separately from job completion.",
+  "remaining": [
+    "Licensed option data and real fill reconciliation are absent; results use model prices.",
+    "Independent human security review and applicable operator/legal review remain incomplete.",
+    "Multi-day healthy soak, physical two-device acceptance and full replacement-VM recovery drill remain incomplete.",
+    "Calendar is reviewed through 2026; future unreviewed years block entries and degrade readiness."
+  ]
+}

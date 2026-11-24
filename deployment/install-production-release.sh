@@ -42,7 +42,9 @@ root=pathlib.Path(sys.argv[1])
 from datetime import datetime
 from zoneinfo import ZoneInfo
 now=datetime.now(ZoneInfo('Asia/Kolkata'))
-assert now.weekday()>=5 or not '09:15'<=now.strftime('%H:%M')<='15:40','Deploy only outside the market session'
+sys.path.insert(0,str(root))
+from exchange_calendar import deployment_allowed
+assert deployment_allowed(now),'Deploy only outside a reviewed exchange session'
 with sqlite3.connect('file:state/paper/intraday_500k.sqlite3?mode=ro',uri=True) as db:
     state=json.loads(db.execute('select body from account where id=1').fetchone()[0])
 assert state['position'] is None,'An open paper position prevents deployment'

@@ -1,6 +1,6 @@
-# Last of Our League — paper-production release 1.2.1
+# Last of Our League — paper-production release 1.2.2
 
-Installed and verified 23 November 2026 on the existing Azure VM; dashboard version 14 is published. The scope remains automatic options **paper trading**, one shared ₹5,00,000 account, separate authenticated clients and one trading worker. No broker execution is enabled. The approved recovery/monitoring resources use the existing student subscription; its spending limit remains On.
+Release 1.2.2 was installed and verified on 24 November 2026 on the existing Azure VM. Dashboard version 17 remains published. Release 1.2.1 verification below is historical evidence. The scope remains automatic options **paper trading**, one shared ₹5,00,000 account, separate authenticated clients and one trading worker. No broker execution is enabled. The approved recovery/monitoring resources use the existing student subscription; its spending limit remains On.
 
 ## Changes and verified safeguards
 
@@ -34,7 +34,7 @@ Tests cover control races, stale/replayed bars, isolated research, authenticated
 - A feed outage blocks entries. Exits can be delayed until valid observations return; a stop rule is not guaranteed execution.
 - Private off-server backups are enabled with seven-day lifecycle retention and seven-day soft delete. The container is encrypted at rest, requires HTTPS/TLS 1.2, blocks anonymous blobs/shared keys and grants the VM identity container-scoped access. This is recovery from VM/disk loss, not independence from the Azure subscription or region. No account backup is exported to either laptop. Snapshots above the 64 MiB job bound fail visibly instead of uploading without a size limit.
 - Browser alerts require the app open. Separately, Azure Monitor checks `/readyz` every five minutes from five locations and notifies the designated email if three locations fail. This runs when the browsers/laptops are closed. An actual harmless activity-event alert fired and the recipient confirmed receiving it. Azure’s manual test-send API is unavailable on this free subscription. These are email alerts, not native phone push notifications.
-- CI files are prepared, but continuous checks must not be described as active unless the complete engine source is connected to a running workflow.
+- GitHub CI is active for the shared source repository; read the current run results before claiming checks passed for a new commit.
 - Azure student credit and allowances are finite. No permanent free-hosting or availability guarantee is made.
 - A long-duration production soak and physical-device end-to-end checks remain separate from the automated release checks.
 
@@ -108,3 +108,45 @@ review but was not installed or executed. No decoys or runtime transformations w
 introduced. See `SECURE_RELEASE.md` for assessment, procedure and limitations:
 browser-delivered code remains copyable. This is not an anti-cloning certification
 or a change to the authoritative cloud trading policy.
+
+
+## 24 November operational hotfix — release 1.2.2
+
+The live readiness endpoint returned 503 during a real exchange holiday because the
+runner treated every weekday as an open session. The new reviewed NSE F&O calendar
+uses [FAOP/71777](https://nsearchives.nseindia.com/content/circulars/FAOP71777.pdf)
+and its [15 January amendment](https://nsearchives.nseindia.com/content/circulars/FAOP72262.pdf).
+Holidays, weekends and unsupported special sessions do not authorise entries or
+unnecessary feed polling. Unreviewed years fail closed and degrade readiness.
+Calendar coverage currently ends on 31 December 2026 and must be maintained against
+new exchange circulars; it is not an automatically updated calendar service.
+
+Exits remain managed; an unresolved position during a closed session still raises
+a fault. Actual stale feeds on regular trading days remain unhealthy. The guarded
+installer uses this calendar and still refuses cutover with an open position.
+The live holiday-window upgrade passed 158 isolated Linux tests; three browser
+parity cases were covered locally. All 161 local Python tests passed. The installer
+verified exact account preservation, the pinned pricing/risk fingerprint and SQLite
+integrity. External HTTPS, authentication, CORS and viewer-control checks passed.
+Readiness recovered to HTTP 200 with closed-market standby. No broker order or
+account-data export was performed. See `deployment/release-1.2.2.json`.
+
+The capacity tool now generates its own hedged sample and synthetic report instead
+of reading a real account or copying personal reports. A fresh local fixture held
+100,500 trades and 100,000 events, served 1,600 requests from 16 clients with zero
+errors (p95 18.49 ms), and passed isolated backup/restore. Its separate burst returned
+429 as intended. These are local storage/HTTP measurements, not VM, market-data,
+exchange-order or simultaneous-position throughput claims. The one-position and
+three-entry daily policy remains in force. Large histories exceeding the configured
+off-host backup bound need a separate capacity/streaming-backup plan.
+
+GitHub CI is active and performs tests, locked-dependency auditing and a Docker
+build. A separate CodeQL workflow scans Python and JavaScript on pushes and pull
+requests. A completed job does not prove the absence of findings: inspect the Security
+tab. Automated scanning is not an independent human security review.
+
+This is a controlled paper deployment. Licensed option prices/fills, extended healthy
+soak evidence, physical two-device acceptance, a full replacement-VM recovery drill
+and applicable operator/legal review remain outstanding. The existing nominal expiry
+pricing model was not silently changed in the pinned running account. This operational
+calendar fix does not validate its option prices, profitability or real-money execution.

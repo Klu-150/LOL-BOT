@@ -92,7 +92,7 @@ def test_liveness_and_readiness_are_distinct_and_errors_are_visible(app):
 
 def test_headers_audit_records_and_versioned_routes_do_not_leak_keys(app):
     response=request(app,'/api/v1/health')
-    assert response['body']['version']=='1.2.1'
+    assert response['body']['version']==__import__('cloud_server').VERSION
     assert response['headers']['X-Frame-Options']=='DENY'
     assert "frame-ancestors 'none'" in response['headers']['Content-Security-Policy']
     request(app,'/api/automation/pause','POST')

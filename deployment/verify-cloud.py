@@ -3,10 +3,12 @@ import argparse
 import json
 import math
 from pathlib import Path
+import sys
 import urllib.error
 import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 ORIGIN = 'https://last-of-our-league-dedf75.indiasouthcentral.cloudapp.azure.com'
 APP = 'https://nifty-research-terminal.nearbydrape.chatgpt.site'
 
@@ -57,7 +59,8 @@ def main():
     health = call('/api/health', 'madhan')
     assert health['automation'].get('state') not in ('error', 'data_error', 'stopped')
     if args.expect_ready:
-        assert health['operations']['ready'] and health['version'] == '1.2.1'
+        from cloud_server import VERSION
+        assert health['operations']['ready'] and health['version'] == VERSION
     print(json.dumps({'https_verified': True, 'authentication_verified': True,
                       'cors_verified': True, 'viewer_control_rejected': True,
                       'closed_trades': paper['closed_trades'], 'open_trades': paper['open_trades'],
