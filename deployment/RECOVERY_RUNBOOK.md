@@ -78,3 +78,35 @@ paper-account mount, limited to 0.5 CPU and 256 MiB. Only the observed Nifty CSV
 mounted read-only; only the research output directory is writable. Results remain
 research-only and never become order instructions. Exchange holidays can produce a
 repeat evaluation of the same saved bars; this is not a new trade or forward signal.
+
+## 24 November 2026 — application rehearsal and observation automation
+
+Release 1.3.2 adds `league-recovery-drill.timer` (Sunday 04:00 IST) and
+`league-soak.timer` (every five minutes). Both use the existing VM. The off-server
+upload service now takes a fresh snapshot immediately before its hourly upload,
+avoiding drift between the independently scheduled local and off-server jobs.
+Local retention remains the latest 24 manifests; Blob lifecycle/soft-delete
+retention is unchanged. Recovery bounds are now 512 MiB raw and 64 MiB compressed,
+with streaming hashes/extraction and mandatory allowlists/integrity checks.
+
+The rehearsal downloads the actual private remote archive and restores to a NEW,
+marked directory. A separate read-only, no-network, unprivileged container boots
+both ledgers with entries disabled, no real credentials and no published ports.
+It verifies policy hashes, private dashboard access, viewer restrictions and exact
+account preservation. On success its temporary account copy is removed. A private
+allowlisted summary remains at `paper/recovery-drill.json`; a failed attempt writes
+`paper/recovery-drill-error.json` and keeps its marked private copy for diagnosis.
+No recovery data leaves the VM. A successful container drill does not test physical
+replacement-VM provisioning or loss of the Azure subscription/region.
+
+`paper/recovery-drill-required` and `paper/soak-required` enable corresponding
+readiness checks. A new failed drill invalidates the previous successful result;
+recovery evidence is version-bound and expires after eight days. Soak observations
+persist across app restarts, are capped at 10,080 rows, and never interpret missing
+observations as uptime. Seven continuous days with required coverage are a minimum
+observation gate, not a claim of a month of market execution or profitability.
+
+Use `systemctl status league-recovery-drill.service league-soak.service` and private
+journals for failures. The API exposes safe summaries only. The guarded installer
+runs required recovery/observer checks after a new image starts and before its
+readiness check, retaining rollback on failure. It captures private failure logs.

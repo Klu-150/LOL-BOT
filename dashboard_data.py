@@ -57,7 +57,7 @@ def paper_snapshot(path):
                   "trades": trades, "decisions": decisions, "notes": notes})
 
 
-def build_snapshot(root=ROOT, account_path=None, policy=None, automation_path=None):
+def build_snapshot(root=ROOT, account_path=None, policy=None, automation_path=None, allow_empty_reports=False):
     root = Path(root)
     primary = root / "results" / "results.json"
     report_files = [primary, *sorted(set([*root.glob("results/*/results.json"),
@@ -79,7 +79,14 @@ def build_snapshot(root=ROOT, account_path=None, policy=None, automation_path=No
         except (ValueError, OSError, pd.errors.ParserError) as exc:
             warnings.append(f"Could not load {path.relative_to(root)}: {exc}")
     if not reports:
-        raise ValueError("No valid results/results.json found. Run run_backtest.py first.")
+        if not allow_empty_reports:
+            raise ValueError("No valid results/results.json found. Run run_backtest.py first.")
+        warnings.append("No research report is loaded. Account records remain available; run a separate replay to produce research results.")
+        reports=[{"id":"research-unavailable","label":"No research report loaded","algorithm":"adaptive_intraday",
+            "timeframe":"intraday","research_available":False,"summary":[{"strategy":"INTRADAY_BOT",
+            "trades":None,"total_rs":None,"win_rate_%":None,"max_drawdown_rs":None}],
+            "equity":{"INTRADAY_BOT":[]},"trades":[],"weekly_decisions":[],"account_ledger":[]}]
+
     reports.sort(key=lambda r: r.get("algorithm") != "adaptive_intraday")
     # Market loading uses the bot's configured local CSVs; never fetch remotely.
     market = regime.classify(regime.add_features(load_market()))

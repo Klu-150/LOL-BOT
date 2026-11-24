@@ -1,0 +1,10 @@
+[Unit]
+Description=Isolated League off-server application recovery rehearsal
+After=docker.service network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /srv/league/source/deployment/recovery-drill.sh
+TimeoutStartSec=180
+NoNewPrivileges=true
+PrivateTmp=true

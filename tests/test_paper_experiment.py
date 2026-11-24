@@ -118,3 +118,35 @@ def test_actual_worker_initializes_only_experiment_and_stops_cleanly(tmp_path):
     finally:
         manager.close()
     assert manager.process.poll() == 0
+
+
+def test_monitor_rejects_experimental_feed_failure_and_future_heartbeat(app):
+    from datetime import datetime,timedelta,timezone
+    import cloud_server as C
+    stamp=datetime.now(timezone.utc)
+    for state,checked in [('awaiting_fresh_market_data',stamp),('storage_guard',stamp),('market_closed',stamp+timedelta(minutes=3))]:
+        app.experiment.status=Mock(return_value={'configured':True,'worker_alive':True,'state':state,'checked_at':checked.isoformat()})
+        assert 'paper_experiment_needs_attention' in app.monitor()['alerts']
+
+
+def test_alive_but_stale_experiment_is_recycled_without_restarting_feed_errors(tmp_path,monkeypatch):
+    from datetime import datetime,timedelta,timezone
+    import experiment_manager as M
+    manager=M.ExperimentManager(tmp_path);old=Mock();old.poll.return_value=None
+    manager.process=old;manager.last_launch=1
+    monkeypatch.setattr(M.time,'monotonic',lambda:1000)
+    spawn=Mock();monkeypatch.setattr(M.subprocess,'Popen',spawn)
+    manager.status=Mock(return_value={'checked_at':datetime.now(timezone.utc).isoformat(),'state':'data_error'})
+    manager.ensure();old.terminate.assert_not_called();spawn.assert_not_called()
+    manager.status.return_value={'checked_at':(datetime.now(timezone.utc)-timedelta(minutes=6)).isoformat()}
+    manager.ensure();old.terminate.assert_called_once();spawn.assert_called_once()
+
+
+def test_supervisor_rejects_well_formed_but_wrong_state_types(tmp_path):
+    from paper_experiment import STATUS_NAME
+    manager=ExperimentManager(tmp_path)
+    manager.control.write_text('[]')
+    assert manager.status()['state']=='error' and not manager.status()['enabled']
+    manager.control.write_text('{"enabled":false}')
+    (tmp_path/STATUS_NAME).write_text('[]')
+    assert manager.status()['state']=='error'

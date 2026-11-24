@@ -7,7 +7,7 @@ has been accepted on the operator's behalf. No customer billing or marketing add
 
 | Item | Implementation / evidence | Remaining operator decision |
 | --- | --- | --- |
-| Privacy policy | Public `privacy.html`: data, purpose, visibility, recipients, retention, rights, security and device controls | Confirm operator legal identity, country, public contact and applicable notice/rights wording before wider customer use |
+| Privacy policy | Public `privacy.html`: data, purpose, visibility, recipients, retention, rights, security and device controls | Operator supplied Venkata Madhan Kanakala, India, kvenkatamadhan734@gmail.com on 24 November 2026; review applicable notice/rights wording before wider customer use |
 | Terms and conditions | Current usage rules explain authorized access, one shared virtual account, modelled fills, service limits and no payment | Legal review and approval of an actual contract, governing law and appropriate remedies before commercial launch; no fabricated click-through acceptance |
 | GDPR compliance | Applicability explicitly unresolved; technical safeguards do not claim certification | Assess UK/EU territorial scope, roles, exemptions, registration/representation and rights duties, as applicable; also assess Indian requirements |
 | Cookie consent | App has no ad/analytics SDK or app-set tracking cookie; device storage is disclosed and manageable | Review host-controlled cookies and classifications; do not add optional tracking without required opt-in and withdrawal controls |
@@ -79,3 +79,7 @@ have actually been assessed. No real user data has been deleted by this change.
 These sources inform the implementation; they do not constitute an independent
 legal opinion or resolve the operator's jurisdiction. This checklist remains open
 for the explicitly identified owner/legal tasks.
+
+## Operator update — 24 November 2026
+
+The operator supplied the name, country and public support/privacy email above and authorised their use in the app notice. This closes the missing-contact detail only. No legal opinion, processing agreement, commercial licence or independent security approval is implied. The workspace now contains separate original and experimental virtual accounts; invited-user access remains shared under the existing roles.

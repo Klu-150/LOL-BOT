@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import shutil
 import tarfile
 import tempfile
 import time
@@ -22,9 +23,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from operations import atomic_json
+from operations import atomic_json,sha256_file
 
-MAX_BYTES = 64 * 1024**2
+MAX_BYTES = 64 * 1024**2  # compressed archive/network bound
+MAX_RESTORE_BYTES = 512 * 1024**2  # aggregate uncompressed database bound
 VERSION = '2023-11-03'
 SNAPSHOT_SUFFIXES = ('-intraday_500k.sqlite3', '-operations.sqlite3', '-intraday_experiment25.sqlite3')
 
@@ -72,9 +74,9 @@ def package_snapshot(directory, destination):
             raise ValueError('Only paper and operations snapshots may leave the VM')
         size = path.stat().st_size
         total += size
-        if total > MAX_BYTES or size != item['bytes']:
+        if total > MAX_RESTORE_BYTES or size != item['bytes']:
             raise ValueError('Backup size limit or manifest mismatch')
-        if hashlib.sha256(path.read_bytes()).hexdigest() != item['sha256']:
+        if sha256_file(path) != item['sha256']:
             raise ValueError('Backup checksum mismatch')
         with closing(sqlite3.connect(path.as_uri()+'?mode=ro', uri=True)) as db:
             if db.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
@@ -138,17 +140,21 @@ class BlobStore:
 
 
 def verify_restore(payload):
+    if len(payload)>MAX_BYTES:raise ValueError('Compressed recovery archive exceeds limit')
     with tempfile.TemporaryDirectory(prefix='league-restore-check-') as root:
         root = Path(root)
         with tarfile.open(fileobj=io.BytesIO(payload), mode='r:gz') as archive:
             members = archive.getmembers()
-            if not 2 <= len(members) <= 4 or sum(m.size for m in members) > MAX_BYTES or len({m.name for m in members}) != len(members):
+            if not 2 <= len(members) <= 4 or sum(m.size for m in members) > MAX_RESTORE_BYTES or len({m.name for m in members}) != len(members):
                 raise ValueError('Invalid recovery archive size')
+            if shutil.disk_usage(root).free < sum(m.size for m in members)+1024**3:
+                raise OSError('Insufficient space for isolated restore with trading headroom')
             for member in members:
                 if not member.isfile() or Path(member.name).name != member.name:
                     raise ValueError('Unsafe recovery archive member')
                 with archive.extractfile(member) as source:
-                    (root/member.name).write_bytes(source.read(MAX_BYTES+1))
+                    with (root/member.name).open('wb') as target:
+                        shutil.copyfileobj(source,target,length=1024*1024)
         manifests = list(root.glob('*.json'))
         if len(manifests) != 1:
             raise ValueError('Missing recovery manifest')
@@ -166,7 +172,7 @@ def verify_restore(payload):
             if not isinstance(name,str) or Path(name).name != name or not name.endswith(SNAPSHOT_SUFFIXES):
                 raise ValueError('Unsafe recovery manifest')
             path = root/name
-            if path.stat().st_size != item['bytes'] or hashlib.sha256(path.read_bytes()).hexdigest() != item['sha256']:
+            if path.stat().st_size != item['bytes'] or sha256_file(path) != item['sha256']:
                 raise ValueError('Restored snapshot checksum mismatch')
             with closing(sqlite3.connect(path.as_uri()+'?mode=ro', uri=True)) as db:
                 if db.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':

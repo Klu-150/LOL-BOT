@@ -1,0 +1,8 @@
+[Unit]
+Description=Weekly League recovery rehearsal outside NSE sessions
+[Timer]
+OnCalendar=Sun *-*-* 04:00:00 Asia/Kolkata
+Persistent=false
+Unit=league-recovery-drill.service
+[Install]
+WantedBy=timers.target

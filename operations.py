@@ -143,6 +143,13 @@ class OperationsStore:
                          (status, json.dumps(body, allow_nan=False, default=str), actor, hashlib.sha256(key.encode()).hexdigest()))
 
 
+def sha256_file(path):
+    digest=hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for chunk in iter(lambda:stream.read(1024*1024),b''):digest.update(chunk)
+    return digest.hexdigest()
+
+
 def backup_database(source, target):
     source, target = Path(source).resolve(), Path(target)
     if source == target.resolve():
@@ -164,7 +171,7 @@ def backup_database(source, target):
     finally:
         temporary.unlink(missing_ok=True)
     return {'file': target.name, 'bytes': target.stat().st_size,
-            'sha256': hashlib.sha256(target.read_bytes()).hexdigest()}
+            'sha256': sha256_file(target)}
 
 
 class BackupManager:

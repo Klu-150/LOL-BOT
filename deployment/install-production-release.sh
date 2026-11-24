@@ -67,6 +67,7 @@ rollback(){
   [ "$result" -ne 0 ] || result=1
   if $CHANGED; then
     echo 'Release verification failed; restoring the previous image and configuration.'
+    docker compose logs --no-color --tail 100 engine > "$STAGE/failed-engine.log" 2>&1 || true
     docker compose stop engine || true
     [ ! -d "$STAGE/old-source" ] || { mv source "$STAGE/failed-source"; mv "$STAGE/old-source" source; }
     cp "$STAGE/compose.yaml" "$STAGE/Caddyfile" .
@@ -86,6 +87,13 @@ mv "$STAGE/source" source
 cp "$UPLOAD/compose.yaml" "$UPLOAD/Caddyfile" .
 docker image tag "$CANDIDATE" league-engine:current
 docker compose up -d --no-build
+# A new image must pass its version-bound recovery rehearsal before readiness.
+if [ -e state/paper/recovery-drill-required ]; then
+  bash source/deployment/recovery-drill.sh
+fi
+if [ -e state/paper/soak-required ]; then
+  docker compose exec -T engine python tools/soak_probe.py --once --output /state/paper/soak.jsonl
+fi
 ready=false
 for attempt in $(seq 1 35); do
   if curl --max-time 5 -fsS http://127.0.0.1:8765/readyz >/dev/null; then ready=true; break; fi

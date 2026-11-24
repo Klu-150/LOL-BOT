@@ -31,7 +31,7 @@ def create_app():
     root=Path(os.environ['LEAGUE_BENCH_ROOT']).resolve()
     if not root.name.startswith('league-capacity-') or not (root/'BENCHMARK_ONLY').is_file():
         raise ValueError('A separate marked capacity fixture is required')
-    C.build_snapshot=lambda:build_snapshot(root)
+    C.build_snapshot=lambda **kwargs:build_snapshot(root,**kwargs)
     users={f'client{i}':{'sha256':hashlib.sha256(TEST_KEY.encode()).hexdigest(),'role':'viewer'} for i in range(32)}
     status={'enabled':False,'state':'market_closed','checked_at':datetime.now(timezone.utc).isoformat(),'mode':'synthetic_capacity_fixture'}
     runtime=SimpleNamespace(trader=SimpleNamespace(db=root/'paper/intraday_500k.sqlite3',status=status),jobs={})

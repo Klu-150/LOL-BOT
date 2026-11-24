@@ -1,7 +1,7 @@
 # Security and privacy incident procedure
 
 Scope: existing shared paper engine, static Site, backups, credentials and user data.
-Owner: workspace operator; named primary/backup contact awaiting confirmation.
+Primary operator: Venkata Madhan Kanakala, India; kvenkatamadhan734@gmail.com. A backup incident contact has not been designated.
 Operational monitoring email is private and is not automatically a public privacy
 contact. No breach has been asserted or notification sent as part of this work.
 

@@ -7,7 +7,7 @@ import tarfile
 ROOT = Path(__file__).resolve().parent.parent
 ARCHIVE = ROOT / 'deployment/league-engine-source.tar.gz'
 INPUTS = ['Dockerfile', 'requirements.txt', 'requirements-cloud.txt', 'requirements-cloud.lock', 'requirements-bootstrap.lock', 'deployment/wheelhouse', 'events.csv',
-          'TRADING_PLAN.md', 'research', 'tools', 'data', 'results', 'dashboard/dist']
+          'TRADING_PLAN.md', 'deployment/recovery-drill.sh', 'research', 'tools', 'data', 'results', 'dashboard/dist']
 
 
 if __name__ == '__main__':

@@ -98,3 +98,15 @@ def test_experiment_and_baseline_both_restore_without_exporting_other_files(tmp_
         for member in original.getmembers():archive.addfile(member,original.extractfile(member))
         member=tarfile.TarInfo('private-access.json');member.size=2;archive.addfile(member,io.BytesIO(b'{}'))
     with pytest.raises(ValueError):verify_restore(blob.getvalue())
+
+
+def test_backup_and_restore_hashes_stream_database_files(tmp_path,monkeypatch):
+    directory=snapshots(tmp_path);output=tmp_path/'streamed.tar.gz'
+    def no_unbounded_reads(path):raise AssertionError('Whole-file read is forbidden for database hashing')
+    monkeypatch.setattr(Path,'read_bytes',no_unbounded_reads)
+    package_snapshot(directory,output)
+    with output.open('rb') as stream:payload=stream.read()
+    assert verify_restore(payload)
+    import offhost_backup as B
+    monkeypatch.setattr(B,'MAX_RESTORE_BYTES',1)
+    with pytest.raises(ValueError):verify_restore(payload)

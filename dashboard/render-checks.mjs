@@ -41,3 +41,12 @@ context.qa.setData(fixture);
 const orderHtml=context.qa.screen('orders');
 for(const label of ['BUY','SELL','Opening','Closing','₹123.45','Modelled fill','PAPER-FIXTURE-OPEN-1'])assert.ok(orderHtml.includes(label),'Orders must show '+label);
 console.log('Populated order-book template passed BUY/SELL, open/close and stored-price checks; fixtures were not saved to the account.');
+
+const recovery=structuredClone(data);
+recovery.reports=[{id:'research-unavailable',label:'No research report loaded',algorithm:'adaptive_intraday',timeframe:'intraday',research_available:false,summary:[{strategy:'INTRADAY_BOT',trades:null,total_rs:null,'win_rate_%':null,max_drawdown_rs:null}],equity:{INTRADAY_BOT:[]},trades:[],weekly_decisions:[],account_ledger:[]}];
+context.qa.setData(recovery);
+for(const page of ['terminal','orders','overview','compare','market','journal','paper','sources']){
+ const html=context.qa.screen(page);
+ assert.ok(!html.includes('NaN')&&!html.includes('undefined')&&!html.includes('Invalid Date'),'Missing research report must not break '+page);
+}
+console.log('Fresh-recovery views render without research reports or fabricated performance.');

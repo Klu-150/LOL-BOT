@@ -23,7 +23,8 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 import intraday_paper as P
 import ledger_store as L
-from operations import backup_database
+from operations import backup_database,BackupManager
+from offhost_backup import package_snapshot,verify_restore
 from tools.capacity_fixture import TEST_KEY, synthetic_closed_trade
 
 
@@ -77,6 +78,9 @@ def main():
         assert len(snapshot['trades'])==min(200,args.trades+transactions)
         assert len(snapshot['decisions'])==min(1000,args.trades)
         backup=backup_database(db,root/'restore.sqlite3');assert L.snapshot(root/'restore.sqlite3')==snapshot
+        BackupManager(db,root/'snapshots').run_once()
+        package_snapshot(root/'snapshots',root/'recovery.tar.gz')
+        assert verify_restore((root/'recovery.tar.gz').read_bytes())
         with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
         env={**os.environ,'LEAGUE_BENCH_ROOT':str(root),'PYTHONPATH':str(ROOT),'OPENBLAS_NUM_THREADS':'1','OMP_NUM_THREADS':'1','MPLCONFIGDIR':str(root/'mpl')}
         log=(root/'gunicorn.log').open('w+')
@@ -128,7 +132,7 @@ def main():
                 'synthetic_seed_seconds':round(seed_seconds,3),'additive_migration_seconds':round(migration_seconds,3),
                 'single_writer_transactions':transactions,'transaction_seconds':round(transaction_seconds,3),
                 'transactions_per_second':round(transactions/transaction_seconds,1),
-                'backup_restore_verified':True,'restored_database_bytes':backup['bytes'],
+                'backup_restore_verified':True,'bounded_offhost_format_restore_verified':True,'restored_database_bytes':backup['bytes'],
                 'workers':1,'threads':4,'concurrent_clients':args.clients,'http_requests':len(observations),
                 'http_errors':sum(row[1]!=200 for row in observations),'elapsed_seconds':round(elapsed,3),
                 'separate_overload_burst':{'requests':len(burst_codes),'accepted':burst_codes.count(200),'rate_limited':burst_codes.count(429)},

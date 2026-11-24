@@ -1,5 +1,10 @@
 name: Paper engine checks
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 2 * * 0'
 permissions:
   contents: read
 concurrency:
@@ -44,3 +49,5 @@ jobs:
         run: |
           python -m pip download --only-binary=:all: --require-hashes -r requirements-bootstrap.lock -r requirements-cloud.lock -d deployment/wheelhouse
       - run: docker build -t league-verify .
+      - name: Check Debian OS advisories and available fixes
+        run: docker run --rm --entrypoint python league-verify tools/os_audit.py

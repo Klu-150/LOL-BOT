@@ -87,3 +87,15 @@ def test_daily_and_intraday_market_columns_remain_independent(tmp_path, monkeypa
     assert result['intraday']['available']
     assert len(result['intraday']['bars'])==3
     assert 'close' in result['market'][0] and 'timestamp' not in result['market'][0]
+
+
+def test_cloud_recovery_keeps_account_visible_without_optional_research_reports(tmp_path,monkeypatch):
+    monkeypatch.setattr(D,'load_market',market)
+    ledger=tmp_path/'paper'/'account.sqlite3'
+    initialise(ledger,20000,market(),as_of=date(2026,11,14),cutoff=date(2026,11,14))
+    snapshot=D.build_snapshot(tmp_path,allow_empty_reports=True)
+    assert snapshot['paper']['available'] and snapshot['paper']['realised_equity_rs']==20000
+    report=snapshot['reports'][0]
+    assert report['research_available'] is False and report['summary'][0]['total_rs'] is None
+    assert report['equity']['INTRADAY_BOT']==[]
+    assert any('No research report' in warning for warning in snapshot['warnings'])

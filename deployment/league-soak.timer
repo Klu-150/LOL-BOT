@@ -1,0 +1,9 @@
+[Unit]
+Description=Observe League readiness every five minutes
+[Timer]
+OnCalendar=*:0/5
+RandomizedDelaySec=5
+Persistent=false
+Unit=league-soak.service
+[Install]
+WantedBy=timers.target

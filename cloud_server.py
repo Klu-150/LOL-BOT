@@ -24,13 +24,14 @@ from dashboard import TerminalRuntime
 from dashboard_data import build_snapshot
 from data import ROOT
 import ledger_store
+from assurance import evidence
 from operations import BackupManager, OperationsStore, RateLimiter, SnapshotCache, WorkerWatchdog, atomic_json, configure_logging, emit
 from feed_transport import transport
 from offhost_backup import status as offhost_status
 from experiment_manager import ExperimentManager
 from paper_experiment import POLICY as EXPERIMENT_POLICY, STATUS_NAME as EXPERIMENT_STATUS
 
-VERSION = '1.3.0'
+VERSION = '1.3.2'
 LOG = logging.getLogger(__name__)
 
 
@@ -108,7 +109,7 @@ class CloudApp:
         thread = getattr(self.runtime.trader, '_thread', None)
         if hasattr(self.runtime.trader, '_thread') and (thread is None or not thread.is_alive()):
             issues.append('worker_not_running')
-        if age is None or age > max(180, 3 * status.get('poll_seconds', 60)):
+        if age is None or age < -60 or age > max(180, 3 * status.get('poll_seconds', 60)):
             issues.append('heartbeat_stale')
         if status.get('state') in ('error', 'data_error', 'awaiting_data', 'square_off_waiting_for_data', 'stopped', 'migrated_to_cloud', 'shutdown_waiting', 'storage_guard', 'calendar_unverified'):
             issues.append(status['state'])
@@ -118,7 +119,7 @@ class CloudApp:
         if experiment['configured']:
             try:experiment_age=(datetime.now(timezone.utc)-datetime.fromisoformat(experiment.get('checked_at'))).total_seconds()
             except (ValueError,TypeError):experiment_age=float('inf')
-            if not experiment['worker_alive'] or experiment_age>180 or experiment.get('state') in ('error','data_error','calendar_unverified','square_off_waiting_for_data'):
+            if not experiment['worker_alive'] or not -60 <= experiment_age <= 180 or experiment.get('state') in ('error','data_error','calendar_unverified','square_off_waiting_for_data','storage_guard','awaiting_data','awaiting_fresh_market_data','stopped'):
                 issues.append('paper_experiment_needs_attention')
         backup = self.backups.status if self.backups else {'state': 'not_configured', 'off_host': False}
         if backup['state'] == 'error':
@@ -126,6 +127,8 @@ class CloudApp:
         offhost = offhost_status(self.control_path.parent / 'offhost-backup.json', (self.control_path.parent / 'offhost-required').exists())
         if offhost['state'] not in ('ok', 'not_configured'):
             issues.append('offhost_backup_' + offhost['state'])
+        assurance = evidence(self.control_path.parent,VERSION)
+        issues.extend(assurance['alerts'])
         free = shutil.disk_usage(self.control_path.parent).free
         if free < 1024 ** 3:
             issues.append('disk_space_low')
@@ -136,7 +139,7 @@ class CloudApp:
                 'backup': backup, 'offhost_backup': offhost, 'snapshot_cache': {'hits': self.cache.hits, 'builds': self.cache.builds, 'ttl_seconds': self.cache.ttl},
                 'storage_free_bytes': free, 'process_peak_rss_bytes': peak_bytes,
                 'counters': dict(self.counters), 'feed_circuits': transport.status(),
-                'execution_workers': 1, 'broker_execution': False}
+                'execution_workers': 1, 'broker_execution': False, 'assurance': assurance}
 
     def __call__(self, env, start_response):
         origin, request_id, user = env.get('HTTP_ORIGIN', ''), uuid.uuid4().hex, None
@@ -209,12 +212,12 @@ class CloudApp:
                 if path == '/api/operations':
                     return respond(200, self.monitor())
                 if path == '/api/dashboard':
-                    return respond(200, self.cache.get(build_snapshot))
+                    return respond(200, self.cache.get(lambda:build_snapshot(allow_empty_reports=True)))
                 if path == '/api/experiment/status':
                     return respond(200,{'automation':self.experiment.status(),'jobs':[],'operations':self.monitor()})
                 if path == '/api/experiment/dashboard':
                     return respond(200,self.experiment_cache.get(lambda:build_snapshot(account_path=self.experiment.db,
-                        policy=EXPERIMENT_POLICY,automation_path=self.control_path.parent/EXPERIMENT_STATUS)))
+                        policy=EXPERIMENT_POLICY,automation_path=self.control_path.parent/EXPERIMENT_STATUS,allow_empty_reports=True)))
                 if path in ('/api/history/trades', '/api/history/events'):
                     try:
                         query = env.get('QUERY_STRING', '')

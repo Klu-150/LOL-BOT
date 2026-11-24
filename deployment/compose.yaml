@@ -10,7 +10,19 @@ services:
       OPENBLAS_NUM_THREADS: "1"
       OMP_NUM_THREADS: "1"
       LEAGUE_TRUST_PROXY: "true"
+      TMPDIR: /state/paper/tmp
     mem_limit: 768m
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - FOWNER
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
     security_opt:
       - no-new-privileges:true
     pids_limit: 128

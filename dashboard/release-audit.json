@@ -7,9 +7,9 @@
       "sha256": "363d8aad362c6019109df5b3a5170daaef02c36eeade0e317e12ba1578306eb6"
     },
     {
-      "file": "assets/app-b875b929c8845447.js",
+      "file": "assets/app-20a71021a62f78ed.js",
       "bytes": 75280,
-      "sha256": "b875b929c8845447d72ef441327073477a3e580230c08a45b1df0db4131b201f"
+      "sha256": "20a71021a62f78ed1c86e8fddddab2caa5540c319ad5dcee43befa86b9627dd1"
     },
     {
       "file": "assets/execution-view-f1b717ac6ba642f9.js",
@@ -32,9 +32,9 @@
       "sha256": "b1941202ed9a96708e812f99d9c1f157c689a764c4f1410e26864c709b5d402e"
     },
     {
-      "file": "assets/privacy-center-2f2c1557e9d8e07c.js",
-      "bytes": 13517,
-      "sha256": "2f2c1557e9d8e07c39f8335d197df65c4f930562d1d6cab03f75ce167e2aabc6"
+      "file": "assets/privacy-center-ab4d906da15a44ed.js",
+      "bytes": 13841,
+      "sha256": "ab4d906da15a44edfc533dc23646a9ba0b3f05f3d90946ed2eb099ccc898b75c"
     },
     {
       "file": "assets/strategy-engine-251c64dd6c468073.js",
@@ -57,11 +57,6 @@
       "sha256": "02bf667a187717ccf90d2f604ab6ad66331368c8ae5b8b34bede0e63ce17f1d4"
     },
     {
-      "file": "assets/terminal-72d836bab996746d.js",
-      "bytes": 18916,
-      "sha256": "72d836bab996746dc916ba9fe7d313a05f728ee12a54903f49049219a566d769"
-    },
-    {
       "file": "assets/terminal-analytics-c88df3781ec9ac2a.js",
       "bytes": 13823,
       "sha256": "c88df3781ec9ac2adac35448b40064203f71c6da6f1007932267aeb7c264593d"
@@ -72,14 +67,19 @@
       "sha256": "17ffb68ac594d91f3fa88e4d3371f44cf948ce34b4470fda51abbd1c8a14a6e6"
     },
     {
+      "file": "assets/terminal-eab2c8b04a05c0b2.js",
+      "bytes": 19046,
+      "sha256": "eab2c8b04a05c0b2a11076736e7f0e1d73a195792764a17f515ce6df4730bec6"
+    },
+    {
       "file": "assets/theme-e2a65548f251d932.js",
       "bytes": 927,
       "sha256": "e2a65548f251d9321ed3ade09e22661c741141d69ad18f0fc52fc4423ea7916e"
     },
     {
-      "file": "assets/trading-tools-c832e834da67bbeb.js",
-      "bytes": 25621,
-      "sha256": "c832e834da67bbebfddadcaa8950828b1bef4d6a5c657ca98291b56b345fa80f"
+      "file": "assets/trading-tools-db7997962c63516c.js",
+      "bytes": 26371,
+      "sha256": "db7997962c63516c70cf81999a06324ff86231a9b8d51c1df2ef1b4d11a19915"
     },
     {
       "file": "data.json",
@@ -109,7 +109,7 @@
     {
       "file": "index.html",
       "bytes": 1518,
-      "sha256": "ee762c8c66e9392300d491bad2bdd49cbf8147a17aa6ae3e9fbbd6f19d6c2fb9"
+      "sha256": "ba1101ccc539038df1c61be31cc8eafca02beceb5c5677f46b67748a8d8a06e3"
     },
     {
       "file": "manifest.webmanifest",
@@ -129,7 +129,7 @@
     {
       "file": "privacy.html",
       "bytes": 876,
-      "sha256": "7d37ae76f84d02c666e4d0d399bec6af4019fddf2646b0c868c2f03bda38795d"
+      "sha256": "adf66107ed02cff43a40f9acc6b3a9fb1893b615ea327b527f01208ed09c1914"
     },
     {
       "file": "strategy-data.json",
@@ -139,7 +139,7 @@
     {
       "file": "sw.js",
       "bytes": 1763,
-      "sha256": "65ac5ed205516c109cdb5edba28900d6f15fb66479b2831ec91717b60d41bbcd"
+      "sha256": "2f64bd88601add15bd053eac785e16c150261093e888cbc0f0fceff7ef03c51e"
     },
     {
       "file": "third-party-notices.txt",
@@ -147,7 +147,7 @@
       "sha256": "d19cb7337a515838505de8b9e6744623e36441d42856e9d8c62d402356b7be9c"
     }
   ],
-  "total_bytes": 4106187,
+  "total_bytes": 4107391,
   "checks": {
     "allowlist": true,
     "symlinks_rejected": true,

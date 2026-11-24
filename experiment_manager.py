@@ -41,13 +41,24 @@ class ExperimentManager:
     def enabled(self):
         if not self.control.exists():return False
         value=json.loads(self.control.read_text())
-        if type(value.get('enabled')) is not bool:raise ValueError('Invalid experiment control')
+        if not isinstance(value,dict) or type(value.get('enabled')) is not bool:raise ValueError('Invalid experiment control')
         return value['enabled']
 
     def ensure(self):
         with self.lock:
             if self.stop.is_set():raise RuntimeError('Experiment supervisor is stopping')
-            if self.process and self.process.poll() is None:return
+            if self.process and self.process.poll() is None:
+                # An alive process can still be hung. Feed-error heartbeats are
+                # healthy liveness; only missing/invalid/stale heartbeats recycle.
+                if time.monotonic()-self.last_launch < 120:return
+                value=self.status()
+                try:age=(datetime.now(timezone.utc)-datetime.fromisoformat(value.get('checked_at'))).total_seconds()
+                except (ValueError,TypeError):age=float('inf')
+                if -60 <= age <= 300:return
+                logging.getLogger(__name__).error('Recycling paper experiment with invalid or stale heartbeat')
+                self.process.terminate()
+                try:self.process.wait(timeout=10)
+                except subprocess.TimeoutExpired:self.process.kill();self.process.wait(timeout=5)
             if time.monotonic()-self.last_launch<15:return
             env={k:v for k,v in os.environ.items() if k in ('PATH','LANG','LC_ALL','TZ','PYTHONPATH','SSL_CERT_FILE','SSL_CERT_DIR')}
             env.update(OPENBLAS_NUM_THREADS='1',OMP_NUM_THREADS='1',MPLCONFIGDIR='/tmp/league-experiment-mpl',PYTHONUNBUFFERED='1')
@@ -72,6 +83,7 @@ class ExperimentManager:
         path=self.directory/STATUS_NAME
         try:
             value=json.loads(path.read_text()) if path.exists() else {'state':'starting' if self.configured() else 'experiment_not_started'}
+            if not isinstance(value,dict):raise ValueError('Invalid experiment status')
             enabled=self.enabled()
         except (OSError,ValueError,TypeError):
             value={'state':'error','error':'Experiment state needs operator review'};enabled=False

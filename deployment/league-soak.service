@@ -1,0 +1,10 @@
+[Unit]
+Description=Bounded League HTTPS readiness observations
+After=docker.service network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec --user 10001 league-engine-1 python /app/tools/soak_probe.py --once --output /state/paper/soak.jsonl
+TimeoutStartSec=45
+NoNewPrivileges=true
+PrivateTmp=true

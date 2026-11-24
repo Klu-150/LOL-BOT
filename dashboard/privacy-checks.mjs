@@ -32,7 +32,7 @@ assert.equal(storage.getItem('unrelated_host_cookie'),'preserve');
 assert.equal(storage.getItem('private_access_key'),'NEVER_EXPORT');
 const html=privacyPage([{key:'<img onerror=alert(1)>',present:true,bytes:1}],'<script>bad</script>');
 assert.ok(!html.includes('<img onerror='));assert.ok(!html.includes('<script>bad'));
-for(const label of ['Privacy notice','Usage rules','Manage this browser','Providers, cookies & licences','awaiting confirmation','seven-day','20,000','no automatic age-based deletion','no checkout'])assert.ok(html.includes(label),label);
+for(const label of ['Privacy notice','Usage rules','Manage this browser','Providers, cookies & licences','Venkata Madhan Kanakala','seven-day','20,000','no automatic age-based deletion','no checkout'])assert.ok(html.includes(label),label);
 const source=fs.readFileSync(new URL('./dist/privacy-center.js',import.meta.url),'utf8');
 assert.ok(!/\bfetch\s*\(/.test(source),'Device actions must not call the engine');
 assert.ok(source.includes('globalThis.confirm('),'Irreversible device deletion requires explicit confirmation');
@@ -45,3 +45,6 @@ toggleTheme(doc,themeStorage);assert.equal(writes,1,'An explicitly requested the
 assert.ok(fs.readFileSync(new URL('./dist/app.js',import.meta.url),'utf8').includes('href="privacy.html"'));
 assert.ok(fs.statSync(new URL('./dist/third-party-notices.txt',import.meta.url)).size>1000);
 console.log('Privacy controls passed scoped export/deletion, unknown-key preservation, UTF-8 sizes, XSS, cloud isolation, notices and default-theme minimization checks.');
+
+assert.ok(html.includes("kvenkatamadhan734@gmail.com") && html.includes("India"));
+assert.ok(!html.includes("Operator identity and public privacy contact are awaiting confirmation"));

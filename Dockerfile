@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 MPLCONFIGDIR=/tmp/matplotlib
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata && \
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && apt-get install -y --no-install-recommends ca-certificates tzdata && \
     rm -rf /var/lib/apt/lists/*
 COPY requirements-cloud.lock requirements-bootstrap.lock ./
 COPY deployment/wheelhouse/ ./wheelhouse/
