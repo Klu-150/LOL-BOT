@@ -121,3 +121,12 @@ The recovery card also shows the connected engine’s off-server backup state, l
 See [TERMINAL_DESIGN.md](TERMINAL_DESIGN.md) for the amber terminal theme,
 model analytics, browser panel controls and data/execution limitations.
 Run `node terminal-analytics-checks.mjs` alongside the existing checks.
+
+## macOS publication gate
+
+Run the Sites source helper with `COPYFILE_DISABLE=1`. Verify the exact resulting
+archive using `tools/check_site_archive.py` and the sanitized checkout's matching
+`release-audit.json` before saving/deploying. The gate rejects macOS metadata
+sidecars as well as extra/private paths and mismatched hashes. A Site version is
+bound to its source commit; saving the same commit can reuse an existing version,
+so retain the native save result rather than assuming a new archive replaced it.

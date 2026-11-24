@@ -1,7 +1,7 @@
 # Readiness record — release 1.3.2
 
 Updated 24 November 2026. Engine 1.3.2 is deployed on the existing Azure VM;
-public dashboard version 20 is published. This is an invited, shared **model-based
+public dashboard version 21 is published. This is an invited, shared **model-based
 options paper workspace**, with separate original and high-risk experimental
 ledgers. No broker execution is enabled. Both pinned policies and private account
 histories were preserved. Prior dated release records remain in Git history.
@@ -45,6 +45,10 @@ mandatory. Larger histories need a measured archival plan; limits are not unlimi
   policy hashes unchanged, back up state, verify exact preservation and roll back
   failures. A real failed hardening attempt rolled back successfully; the corrected
   bootstrap was tested separately before retry. Failure logs stay private.
+- The final static archive must match the approved manifest and 29 public files
+  exactly. macOS metadata sidecars were removed and the replacement archive passed
+  the strict inventory/hash check before publication; this gate is explicit in
+  AGENTS.md and SECURE_RELEASE.md.
 - Future upgrades run the required version-bound recovery rehearsal before
   readiness, preventing a stale previous-release recovery report from approving
   a new image. Completed recovery copies are removed; failed copies remain private

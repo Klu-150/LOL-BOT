@@ -14,3 +14,11 @@ credentials, private reports, backups, vendor ZIPs, runtime files or unrelated e
 Read COLLABORATION.md for the two-developer workflow. A Git push is distinct from
 website publication and engine deployment; report each status accurately. Keep
 automatic trading in paper mode and preserve the running account and pinned policy.
+
+# Static publication gate
+
+Follow SECURE_RELEASE.md for every Sites publication. On macOS the source helper
+must run with COPYFILE_DISABLE=1. Before saving/deploying the exact archive, run
+`python tools/check_site_archive.py /absolute/archive.tar.gz --audit /absolute/sanitized/checkout/release-audit.json`.
+A failing archive check blocks publication. Never use a private local account
+snapshot or a mismatched build audit to satisfy the gate.
