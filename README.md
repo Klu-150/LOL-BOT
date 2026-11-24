@@ -13,19 +13,21 @@ and no real orders are submitted.
 ## Shared cloud use and production checks
 
 Both laptops should open the same public dashboard and connect using their own
-credentials under **Connect devices**. One cloud engine owns the shared paper
-account; the viewer cannot start or pause it. Closing either laptop does not stop
+credentials under **Connect devices**. One cloud engine manages the separate
+original and experimental virtual accounts; the viewer cannot start or pause it. Closing either laptop does not stop
 the server. Do not start a duplicate local engine for the migrated account.
 
-Release 1.2.0 hardens entry/pause concurrency, data validation, disk guards,
-worker recovery, backups and deployment safety. See
-[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) and `deployment/status.json`
-for verified deployment status and remaining operational limits.
+Release 1.3.2 adds read-only runtime hardening, OS patch checks, verified off-server
+application-recovery rehearsals and persistent reliability observations. See
+[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for measured evidence and remaining
+qualification requirements, and [EXPERIMENT25.md](EXPERIMENT25.md) for the separate
+high-risk virtual account. Real options quotes and independent review remain
+unverified; the seven-day observation period is collecting. No real money is traded.
 
 ## Server access for deploys
 
 SSH to the Azure VM goes only over the owner's private Tailscale network
-(device `league-engine`, YOUR_PRIVATE_VM_ADDRESS). The public port 22 rule was removed on
+(device `league-engine`, 100.68.162.75). The public port 22 rule was removed on
 22 November 2026, so deploys need neither `az login` nor a fixed home IP address.
 Run `deployment/upgrade-paper-engine.sh` from this Mac with Tailscale connected
 (`LEAGUE_VM_HOST` overrides the address). Emergency fallback if Tailscale is down:
