@@ -1,10 +1,11 @@
 import {terminal,ordersView} from './terminal.js';
-import {TerminalApi,isLocalHost} from './terminal-api.js';
+import {TerminalApi,isLocalHost,accountPath} from './terminal-api.js';
 import {CloudApi,mobilePage,mobileNav,initialiseMobile} from './mobile-app.js';
 import {StrategyWorkshop} from './strategy-workshop.js';
 import {TradingTools} from './trading-tools.js';
 import {initializeTheme,currentTheme,toggleTheme} from './theme.js';
 import {analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder} from './terminal-analytics.js';
+import {accountPanel} from './account-panel.js';
 initializeTheme();
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -50,8 +51,10 @@ function routeFromHash(hash){
  return {view,bookTab:view==='terminal'?(tab||'positions'):null};
 }
 const initialRoute=routeFromHash(location.hash)||{view:'terminal',bookTab:'positions'};
+const requestedPaperProfile=typeof location.search==='string'&&/(?:^\?|&)account=adaptive25(?:&|$)/.test(location.search)?'adaptive25':'baseline';
 const state = {view:initialRoute.view,report:0,strategy:'REGIME_BOT',range:'all',start:'',end:'',chart:'equity',compare:['REGIME_BOT','LEGACY_BOT','bear_call_spread'],sort:'total_rs',direction:-1,journalStrategy:'REGIME_BOT',search:'',page:0,marketPage:0,drawer:null,instrument:'nifty',candleTimeframe:'5m',bookTab:initialRoute.bookTab||'positions',session:'',backtestId:null,orderSide:'all',orderPhase:'all',orderPage:0};
 const report = () => [...snapshot.reports,...imported][state.report];
+state.paperProfile=requestedPaperProfile;
 const summary = sid => report().summary.find(row=>row.strategy===sid);
 const strategies = () => report().summary.map(row=>row.strategy);
 const colour = sid => sid==='REGIME_BOT'?palette[0]:sid==='LEGACY_BOT'?palette[1]:palette[2+Math.max(0,strategies().filter(s=>!['REGIME_BOT','LEGACY_BOT'].includes(s)).indexOf(sid))%7];
@@ -130,18 +133,20 @@ function ordersPage(){
  const paper=snapshot.paper;
  return `${heading('Orders','Recorded BUY / SELL leg fills from your forward virtual account.','PAPER ORDER BOOK')}<div class="kpis">${kpi('Recorded paper fills',num(all.length),'<span>Opening and closing legs</span>',{iconName:'book'})}${kpi('BUY fills',num(all.filter(o=>o.side==='BUY').length),'<span>Virtual purchases / short covers</span>',{iconName:'arrowup'})}${kpi('SELL fills',num(all.filter(o=>o.side==='SELL').length),'<span>Virtual sales / long exits</span>',{iconName:'chart'})}${kpi('Open positions',num(paper.open_trades||0),'<span>Managed by the strategy engine</span>',{iconName:'layers'})}</div><section class="panel"><div class="panel-header"><div><h2 class="panel-title">Paper order history</h2><p class="panel-subtitle">Prices come from stored model fills · no broker submissions or resting orders</p></div><button class="btn" data-action="export-orders">${icon('download')}Export orders</button></div><div class="toolbar order-filters"><div class="toolbar-left"><label class="inline-filter">SIDE <select id="order-side" class="select" aria-label="Order side">${['all','BUY','SELL'].map(v=>`<option value="${v}" ${state.orderSide===v?'selected':''}>${v==='all'?'All sides':v}</option>`).join('')}</select></label><label class="inline-filter">POSITION <select id="order-phase" class="select" aria-label="Opening or closing orders">${['all','OPEN','CLOSE'].map(v=>`<option value="${v}" ${state.orderPhase===v?'selected':''}>${v==='all'?'Opening & closing':v==='OPEN'?'Opening only':'Closing only'}</option>`).join('')}</select></label></div><span class="tag gray">${num(rows.length)} fills</span></div>${ordersView(paper,{e,num,money,human,date,icon},{rows:rows.slice(state.orderPage*size,(state.orderPage+1)*size),total:rows.length})}${rows.length?pagination('orders',state.orderPage,pages,rows.length,size):''}</section><div class="note-strip" style="margin-top:18px">${icon('info')}<div><strong>These are paper fills, not exchange orders.</strong> The engine records a BUY or SELL for each option leg at entry and the opposite side when closing. Missing fill records are never reconstructed from current prices.</div></div>${(paper.order_warnings||[]).map(w=>`<p class="coverage">${e(w)}</p>`).join('')}`;
 }
-function terminalPage(){return terminal({snapshot,state,icon,e,num,money,pct,human,date,chart,sourceMode,automation,controlAllowed:!cloudSession||!!localApi.permissions.control})+analyticsWorkspace(snapshot,platform?.meta,{...state,proMetaError:platform?.metaError});}
+function terminalPage(){return accountPanel(snapshot,sourceMode,state.paperProfile,engineConnected()&&localApi.supportsExperiments)+terminal({snapshot,state,icon,e,num,money,pct,human,date,chart,sourceMode,automation,controlAllowed:!cloudSession||!!localApi.permissions.control})+analyticsWorkspace(snapshot,platform?.meta,{...state,proMetaError:platform?.metaError});}
 async function localAction(path){
  if(!engineConfigured())throw new Error('Connect your hosted paper engine in the App tab to use remote controls.');
- try{const data=await localApi.action(path);sourceMode=connectedMode();connectionError='';return data;}
+ try{if((snapshot.paper_profile?.id==='adaptive25')!==(state.paperProfile==='adaptive25'))throw Error('Wait for the selected account to connect before using its controls.');if(state.paperProfile==='adaptive25'&&path==='/api/backtest/run')throw Error('Use the documented experimental replay command; this button runs the original policy only.');if(state.paperProfile==='adaptive25'&&(!localApi.remote||!localApi.supportsExperiments))throw Error('Connect to the hosted engine with experiment support first.');const data=await localApi.action(accountPath(path,state.paperProfile));sourceMode=connectedMode();connectionError='';return data;}
  catch(error){disconnected(error);render();throw error;}
 }
 async function pollStatus(){
- if(!engineConfigured()||polling||state.cloudConnecting||document.activeElement?.closest?.('.pro-panel')||state.view==='mobile'&&document.activeElement?.closest?.('#cloud-connect')||state.view==='strategies'&&document.activeElement?.closest?.('.strategy-studio')||['desk','options','review'].includes(state.view)&&document.activeElement?.closest?.('.platform-page'))return;
+ if(!engineConfigured()||polling||state.cloudConnecting||document.activeElement?.matches?.('[data-pro-slider]:active,#paper-profile:active')||state.view==='mobile'&&document.activeElement?.closest?.('#cloud-connect')||state.view==='strategies'&&document.activeElement?.closest?.('.strategy-studio')||['desk','options','review'].includes(state.view)&&document.activeElement?.closest?.('.platform-page'))return;
  polling=true;
+ const profile=state.paperProfile,api=localApi;
  try{
   if(!engineConnected()){await load();return;}
-  const data=await localApi.read('/api/status');
+  const data=await api.read(accountPath('/api/status',profile));
+  if(profile!==state.paperProfile||api!==localApi)return;
   const previous=JSON.stringify([automation,localApi.operations]);
   localApi.operations=data.operations||null;
   automation=data.automation||{};
@@ -233,16 +238,19 @@ function bindCharts(){for(const svg of $$('[data-chart]')){
 }}
 
 async function load(refresh=false){
- const local=engineConfigured();
+ const local=engineConfigured(),profile=state.paperProfile,api=localApi;
  let data;
  if(local){
   if(!statusTimer)statusTimer=setInterval(pollStatus,5000);
   try{
-   automation=await localApi.connect();
-   data=await localApi.read('/api/dashboard');
+   let nextAutomation=await api.connect();
+   if(profile==='adaptive25'){if(!api.supportsExperiments)throw Error('This engine does not support separate paper experiments.');nextAutomation=(await api.read('/api/experiment/status')).automation;}
+   data=await api.read(accountPath('/api/dashboard',profile));
+   if(profile!==state.paperProfile||api!==localApi)return;
+   automation=nextAutomation;
    if(!Array.isArray(data.reports)||!data.reports.length)throw new Error('The paper server has no reports. Run the backtest first.');
    sourceMode=connectedMode();connectionError='';
-  }catch(error){disconnected(error);}
+  }catch(error){if(profile!==state.paperProfile||api!==localApi)return;disconnected(error);}
  }
  if(!data){
   if(local&&snapshot)data=snapshot;
@@ -254,6 +262,7 @@ async function load(refresh=false){
   if(!local)sourceMode='snapshot';
  }
  if(!Array.isArray(data.reports)||!data.reports.length)throw new Error('The snapshot has no reports. Run run_backtest.py first.');
+ if(profile!==state.paperProfile||api!==localApi)return;
  snapshot=data;
  if(state.report>=data.reports.length+imported.length)resetReport(0);
  if(!strategies().includes(state.strategy))resetReport(state.report);
@@ -304,10 +313,11 @@ document.addEventListener('submit',async ev=>{
  try{
   const api=new CloudApi(form.elements.server.value.trim(),form.elements.username.value.trim(),keyInput.value.trim());
   const nextAutomation=await api.connect();
-  const nextSnapshot=await api.read('/api/dashboard');
+  if(state.paperProfile==='adaptive25'&&!api.supportsExperiments)throw Error('This server does not support the selected paper experiment.');
+  const nextSnapshot=await api.read(accountPath('/api/dashboard',state.paperProfile));
   if(!Array.isArray(nextSnapshot.reports)||!nextSnapshot.reports.length)throw new Error('The hosted engine has no valid dashboard reports.');
   cloudSession={origin:api.origin,name:form.elements.username.value.trim()};localApi=api;
-  automation=nextAutomation;snapshot=nextSnapshot;sourceMode='cloud';connectionError='';resetReport(0);
+  automation=state.paperProfile==='adaptive25'?(await api.read('/api/experiment/status')).automation:nextAutomation;snapshot=nextSnapshot;sourceMode='cloud';connectionError='';resetReport(0);
   try{localStorage.setItem('league_cloud_server',api.origin)}catch{}
   if(!statusTimer)statusTimer=setInterval(pollStatus,5000);
   toast('Hosted paper engine connected. Your access key stays in this app session.');
@@ -334,7 +344,7 @@ document.addEventListener('click',async ev=>{const button=ev.target.closest('[da
 });
 document.addEventListener('change',ev=>{const el=ev.target;if(el.id==='order-side'){state.orderSide=el.value;state.orderPage=0;render()}if(el.id==='order-phase'){state.orderPhase=el.value;state.orderPage=0;render()}if(el.id==='session-select'){state.session=el.value;render()}if(el.id==='report-select'){resetReport(+el.value);render()}if(el.id==='strategy-select'){state.strategy=el.value;state.journalStrategy=el.value;render()}if(el.id==='journal-strategy'){state.journalStrategy=el.value;state.page=0;render()}if(el.id==='from-date'||el.id==='to-date'){const from=el.id==='from-date'?el.value:state.start,to=el.id==='to-date'?el.value:state.end;if(from&&to&&from>to){toast('The start date must precede the end date.');render();return}state.start=from;state.end=to;state.range='custom';state.page=state.marketPage=0;render()}});
 document.addEventListener('input',ev=>{if(ev.target.closest?.('#strategy-builder')&&workshop)workshop.capture(ev.target.closest('#strategy-builder'));if(ev.target.matches?.('[data-pro-slider]')){const output=ev.target.parentElement.querySelector('output');if(output)output.textContent=ev.target.value+(ev.target.dataset.proSlider==='proIv'?'pp':ev.target.dataset.proSlider==='proDays'?'d':'%');}});
-document.addEventListener('change',ev=>{if(ev.target.id==='pro-structure'){state.proStructure=ev.target.value;render();}if(ev.target.matches?.('[data-pro-slider]')){const key=ev.target.dataset.proSlider;if(!['proMove','proIv','proDays'].includes(key))return;state[key]=Number(ev.target.value);render();document.querySelector(`[data-pro-slider="${key}"]`)?.focus();}});
+document.addEventListener('change',async ev=>{if(ev.target.id==='paper-profile'){if(!['baseline','adaptive25'].includes(ev.target.value)||state.controlPending)return;state.paperProfile=ev.target.value;try{await load(true);}catch(error){toast(error.message);}return;}if(ev.target.id==='pro-structure'){state.proStructure=ev.target.value;render();}if(ev.target.matches?.('[data-pro-slider]')){const key=ev.target.dataset.proSlider;if(!['proMove','proIv','proDays'].includes(key))return;state[key]=Number(ev.target.value);render();document.querySelector(`[data-pro-slider="${key}"]`)?.focus();}});
 document.addEventListener('change',async ev=>{
  if(ev.target.closest?.('#strategy-builder')&&workshop)workshop.capture(ev.target.closest('#strategy-builder'));
  if(ev.target.id==='studio-template'&&ev.target.value){workshop.fresh(ev.target.value);return;}

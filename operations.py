@@ -178,7 +178,7 @@ class BackupManager:
     def run_once(self):
         self.directory.mkdir(parents=True, exist_ok=True)
         self.directory.chmod(0o700)
-        sources = [path for path in (self.source, self.source.parent / 'operations.sqlite3') if path.exists()]
+        sources = [path for path in (self.source, self.source.parent / 'operations.sqlite3',self.source.parent/'intraday_experiment25.sqlite3') if path.exists()]
         estimated = sum(path.stat().st_size + (Path(str(path)+'-wal').stat().st_size if Path(str(path)+'-wal').exists() else 0)
                         for path in sources)
         if shutil.disk_usage(self.directory).free < estimated + 1024**3:

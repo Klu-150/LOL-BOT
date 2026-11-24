@@ -79,3 +79,22 @@ def test_failed_offhost_backup_degrades_readiness_when_required(tmp_path):
     (tmp_path/'offhost-backup.json').write_text(json.dumps({'state':'ok','last_success_at':datetime.now(timezone.utc).isoformat(),'restore_verified':True}))
     assert app.monitor()['offhost_backup']['off_host']
     assert not any('offhost' in item for item in app.monitor()['alerts'])
+
+
+def test_experiment_and_baseline_both_restore_without_exporting_other_files(tmp_path):
+    directory=snapshots(tmp_path)
+    source=tmp_path/'intraday_experiment25.sqlite3'
+    with sqlite3.connect(source) as db:
+        db.execute('create table account(body text)')
+        db.execute('insert into account values(?)',('{"equity":500000,"profile":"adaptive25"}',))
+    BackupManager(tmp_path/'intraday_500k.sqlite3',directory).run_once()
+    output=tmp_path/'roundtrip.gz'
+    metadata,_=package_snapshot(directory,output)
+    assert len(metadata['files'])==2
+    assert any(x['file'].endswith('-intraday_experiment25.sqlite3') for x in metadata['files'])
+    assert verify_restore(output.read_bytes())
+    blob=io.BytesIO()
+    with tarfile.open(output) as original,tarfile.open(fileobj=blob,mode='w:gz') as archive:
+        for member in original.getmembers():archive.addfile(member,original.extractfile(member))
+        member=tarfile.TarInfo('private-access.json');member.size=2;archive.addfile(member,io.BytesIO(b'{}'))
+    with pytest.raises(ValueError):verify_restore(blob.getvalue())

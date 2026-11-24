@@ -1,4 +1,4 @@
-import {TerminalApi} from './terminal-api-954788358d3cf4e2.js';
+import {TerminalApi} from './terminal-api-17ffb68ac594d91f.js';
 export function serverOrigin(value){
  let url;try{url=new URL(value)}catch{throw new Error('Enter your hosted engine HTTPS address.');}
  if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/')throw new Error('Use an HTTPS server origin without a path, password or query.');

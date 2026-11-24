@@ -45,11 +45,19 @@ now=datetime.now(ZoneInfo('Asia/Kolkata'))
 sys.path.insert(0,str(root))
 from exchange_calendar import deployment_allowed
 assert deployment_allowed(now),'Deploy only outside a reviewed exchange session'
-with sqlite3.connect('file:state/paper/intraday_500k.sqlite3?mode=ro',uri=True) as db:
-    state=json.loads(db.execute('select body from account where id=1').fetchone()[0])
-assert state['position'] is None,'An open paper position prevents deployment'
-assert all((root/name).is_file() and hashlib.sha256((root/name).read_bytes()).hexdigest()==value for name,value in state['fingerprint'].items()),'Strategy fingerprint changed'
-pathlib.Path(sys.argv[2]).write_text(json.dumps(state,sort_keys=True))
+accounts={}
+for name in ('intraday_500k.sqlite3','intraday_experiment25.sqlite3'):
+    path=pathlib.Path('state/paper')/name
+    if not path.exists():
+        assert name!='intraday_500k.sqlite3','Missing baseline ledger'
+        continue
+    with sqlite3.connect(path.as_uri()+'?mode=ro' if path.is_absolute() else 'file:'+str(path)+'?mode=ro',uri=True) as db:
+        state=json.loads(db.execute('select body from account where id=1').fetchone()[0])
+        assert db.execute('pragma integrity_check').fetchone()[0]=='ok'
+    assert state['position'] is None,'An open paper position prevents deployment'
+    assert all((root/module).is_file() and hashlib.sha256((root/module).read_bytes()).hexdigest()==value for module,value in state['fingerprint'].items()),'Strategy fingerprint changed'
+    accounts[name]=state
+pathlib.Path(sys.argv[2]).write_text(json.dumps(accounts,sort_keys=True))
 PY
 OLD_IMAGE=$(docker inspect league-engine-1 --format '{{.Image}}')
 cp -a compose.yaml Caddyfile "$STAGE/"
@@ -93,10 +101,11 @@ PY
 python3 - "$STAGE/account-before.json" <<'PY'
 import json,pathlib,sqlite3,sys
 before=json.loads(pathlib.Path(sys.argv[1]).read_text())
-with sqlite3.connect('file:state/paper/intraday_500k.sqlite3?mode=ro',uri=True) as db:
-    after=json.loads(db.execute('select body from account where id=1').fetchone()[0])
-    assert db.execute('pragma integrity_check').fetchone()[0]=='ok'
-assert before==after,'Account state changed during cutover; operator review required'
+for name,state in before.items():
+    with sqlite3.connect('file:state/paper/'+name+'?mode=ro',uri=True) as db:
+        after=json.loads(db.execute('select body from account where id=1').fetchone()[0])
+        assert db.execute('pragma integrity_check').fetchone()[0]=='ok'
+    assert state==after,'Account state changed during cutover; operator review required'
 PY
 CHANGED=false
 trap - ERR INT TERM

@@ -1,3 +1,5 @@
+import {accountPanel} from './dist/account-panel.js';
+import {accountPath} from './dist/terminal-api.js';
 import {analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder} from './dist/terminal-analytics.js';
 // Template/unit checks complement browser verification.
 import fs from 'node:fs';
@@ -11,7 +13,7 @@ import {initializeTheme,currentTheme,toggleTheme} from './dist/theme.js';
 const text=fs.readFileSync(new URL('./dist/app.js',import.meta.url),'utf8').split("$('#file-input').addEventListener")[0].replace(/^import .*;\n/gm,'');
 const root={innerHTML:''};
 const document={querySelector:()=>root,querySelectorAll:()=>[],activeElement:null};
-const context=vm.createContext({location:{hash:''},Intl,Date,Set,Map,Number,Math,console,document,terminal,ordersView,TerminalApi,isLocalHost,CloudApi,mobilePage,mobileNav,initialiseMobile,TradingTools,initializeTheme,currentTheme,toggleTheme,analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder});
+const context=vm.createContext({location:{hash:''},Intl,Date,Set,Map,Number,Math,console,document,terminal,ordersView,TerminalApi,isLocalHost,CloudApi,mobilePage,mobileNav,initialiseMobile,TradingTools,initializeTheme,currentTheme,toggleTheme,accountPanel,accountPath,analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder});
 vm.runInContext(text+`\nglobalThis.qa={setData(data){snapshot=data;resetReport(0);},screen(name){const pages={terminal:terminalPage,orders:ordersPage,overview,compare,market:marketPage,journal,paper,sources};return pages[name]();},shell(){render();},setMode(mode){sourceMode=mode;automation={state:'market_closed',enabled:true};}}`,context);
 const data=JSON.parse(fs.readFileSync(new URL('./dist/data.json',import.meta.url)));
 context.qa.setData(data);

@@ -26,6 +26,7 @@ from operations import atomic_json
 
 MAX_BYTES = 64 * 1024**2
 VERSION = '2023-11-03'
+SNAPSHOT_SUFFIXES = ('-intraday_500k.sqlite3', '-operations.sqlite3', '-intraday_experiment25.sqlite3')
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -56,7 +57,7 @@ def package_snapshot(directory, destination):
     if manifest.stat().st_size > 65536:
         raise ValueError('Oversized backup manifest')
     metadata = json.loads(manifest.read_text())
-    if metadata.get('state') != 'ok' or not 1 <= len(metadata.get('files', [])) <= 2:
+    if metadata.get('state') != 'ok' or not 1 <= len(metadata.get('files', [])) <= 3:
         raise ValueError('Invalid backup manifest')
     stamp = datetime.fromisoformat(metadata['at'])
     if stamp.tzinfo is None or not -60 <= (datetime.now(timezone.utc)-stamp).total_seconds() <= 5400:
@@ -67,7 +68,7 @@ def package_snapshot(directory, destination):
         path = directory/name
         if not isinstance(name, str) or Path(name).name != name or path.is_symlink() or path.resolve().parent != directory:
             raise ValueError('Unsafe backup filename')
-        if not name.endswith(('-intraday_500k.sqlite3', '-operations.sqlite3')):
+        if not name.endswith(SNAPSHOT_SUFFIXES):
             raise ValueError('Only paper and operations snapshots may leave the VM')
         size = path.stat().st_size
         total += size
@@ -141,7 +142,7 @@ def verify_restore(payload):
         root = Path(root)
         with tarfile.open(fileobj=io.BytesIO(payload), mode='r:gz') as archive:
             members = archive.getmembers()
-            if not 2 <= len(members) <= 3 or sum(m.size for m in members) > MAX_BYTES:
+            if not 2 <= len(members) <= 4 or sum(m.size for m in members) > MAX_BYTES or len({m.name for m in members}) != len(members):
                 raise ValueError('Invalid recovery archive size')
             for member in members:
                 if not member.isfile() or Path(member.name).name != member.name:
@@ -151,13 +152,21 @@ def verify_restore(payload):
         manifests = list(root.glob('*.json'))
         if len(manifests) != 1:
             raise ValueError('Missing recovery manifest')
+        if manifests[0].stat().st_size > 65536:
+            raise ValueError('Oversized recovery manifest')
         metadata = json.loads(manifests[0].read_text())
+        files = metadata.get('files', [])
+        if metadata.get('state') != 'ok' or not 1 <= len(files) <= 3:
+            raise ValueError('Invalid recovery manifest')
+        names = [item['file'] for item in files]
+        if len(set(names)) != len(names) or set(names) | {manifests[0].name} != {m.name for m in members}:
+            raise ValueError('Recovery manifest members mismatch')
         for item in metadata['files']:
             name = item['file']
-            if Path(name).name != name:
+            if not isinstance(name,str) or Path(name).name != name or not name.endswith(SNAPSHOT_SUFFIXES):
                 raise ValueError('Unsafe recovery manifest')
             path = root/name
-            if hashlib.sha256(path.read_bytes()).hexdigest() != item['sha256']:
+            if path.stat().st_size != item['bytes'] or hashlib.sha256(path.read_bytes()).hexdigest() != item['sha256']:
                 raise ValueError('Restored snapshot checksum mismatch')
             with closing(sqlite3.connect(path.as_uri()+'?mode=ro', uri=True)) as db:
                 if db.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':

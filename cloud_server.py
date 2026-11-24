@@ -27,8 +27,10 @@ import ledger_store
 from operations import BackupManager, OperationsStore, RateLimiter, SnapshotCache, WorkerWatchdog, atomic_json, configure_logging, emit
 from feed_transport import transport
 from offhost_backup import status as offhost_status
+from experiment_manager import ExperimentManager
+from paper_experiment import POLICY as EXPERIMENT_POLICY, STATUS_NAME as EXPERIMENT_STATUS
 
-VERSION = '1.2.2'
+VERSION = '1.3.0'
 LOG = logging.getLogger(__name__)
 
 
@@ -69,6 +71,8 @@ class CloudApp:
         self.limiter, self.cache = RateLimiter(), SnapshotCache()
         self.store = OperationsStore(self.control_path.parent / 'operations.sqlite3')
         self.backups = None
+        self.experiment=ExperimentManager(self.control_path.parent)
+        self.experiment_cache=SnapshotCache()
         self.started = time.monotonic()
         self.counter_lock = threading.Lock()
         self.counters = {'requests': 0, 'rejected': 0, 'errors': 0}
@@ -110,6 +114,12 @@ class CloudApp:
             issues.append(status['state'])
         if status.get('state') == 'awaiting_fresh_market_data':
             issues.append('market_data_stale')
+        experiment=self.experiment.status()
+        if experiment['configured']:
+            try:experiment_age=(datetime.now(timezone.utc)-datetime.fromisoformat(experiment.get('checked_at'))).total_seconds()
+            except (ValueError,TypeError):experiment_age=float('inf')
+            if not experiment['worker_alive'] or experiment_age>180 or experiment.get('state') in ('error','data_error','calendar_unverified','square_off_waiting_for_data'):
+                issues.append('paper_experiment_needs_attention')
         backup = self.backups.status if self.backups else {'state': 'not_configured', 'off_host': False}
         if backup['state'] == 'error':
             issues.append('backup_failed')
@@ -152,7 +162,7 @@ class CloudApp:
                 self.counters['rejected'] += int(400 <= code < 500)
                 self.counters['errors'] += int(code >= 500)
             if method == 'POST' or code >= 400:
-                action = path if path in ('/api/automation/start', '/api/automation/pause', '/api/backtest/run') else 'api_request'
+                action = path if path in ('/api/automation/start', '/api/automation/pause', '/api/backtest/run','/api/experiment/start','/api/experiment/pause') else 'api_request'
                 if code != 429:  # Rejected floods must not turn into a database-write flood.
                     try:
                         self.store.audit(user['name'] if user else None, action, code, request_id)
@@ -191,7 +201,7 @@ class CloudApp:
                 if path == '/api/health':
                     return respond(200, {'status': 'ok', 'mode': 'paper', 'execution': 'cloud', 'version': VERSION,
                                          'user': user, 'permissions': {'control': user['role'] == 'trader'},
-                                         'capabilities': {'idempotency': True, 'operations': True},
+                                         'capabilities': {'idempotency': True, 'operations': True, 'paper_experiments': True},
                                          'automation': self.runtime.trader.status, 'operations': self.monitor()})
                 if path == '/api/status':
                     jobs = self.runtime.jobs_snapshot() if hasattr(self.runtime, 'jobs_snapshot') else list(self.runtime.jobs.values())
@@ -200,6 +210,11 @@ class CloudApp:
                     return respond(200, self.monitor())
                 if path == '/api/dashboard':
                     return respond(200, self.cache.get(build_snapshot))
+                if path == '/api/experiment/status':
+                    return respond(200,{'automation':self.experiment.status(),'jobs':[],'operations':self.monitor()})
+                if path == '/api/experiment/dashboard':
+                    return respond(200,self.experiment_cache.get(lambda:build_snapshot(account_path=self.experiment.db,
+                        policy=EXPERIMENT_POLICY,automation_path=self.control_path.parent/EXPERIMENT_STATUS)))
                 if path in ('/api/history/trades', '/api/history/events'):
                     try:
                         query = env.get('QUERY_STRING', '')
@@ -216,7 +231,7 @@ class CloudApp:
                 return respond(404, {'error': 'Unsupported paper API path'})
             if method != 'POST':
                 return respond(405, {'error': 'Use GET or POST'}, [('Allow', 'GET, POST, OPTIONS')])
-            if path not in ('/api/automation/start', '/api/automation/pause', '/api/backtest/run'):
+            if path not in ('/api/automation/start', '/api/automation/pause', '/api/backtest/run','/api/experiment/start','/api/experiment/pause'):
                 return respond(404, {'error': 'Unsupported paper action'})
             if user['role'] != 'trader':
                 return respond(403, {'error': 'This account can view results but cannot control the paper engine'})
@@ -248,7 +263,10 @@ class CloudApp:
             if claim == 'full':
                 return respond(503, {'error': 'Action records are full; operator review required'})
             with self.control_lock:
-                if path in ('/api/automation/start', '/api/automation/pause'):
+                if path in ('/api/experiment/start','/api/experiment/pause'):
+                    value=self.experiment.start() if path.endswith('/start') else self.experiment.pause()
+                    code=200
+                elif path in ('/api/automation/start', '/api/automation/pause'):
                     enabled = path.endswith('/start')
                     atomic_json(self.control_path, {'enabled': enabled})
                     value = self.runtime.trader.start() if enabled else self.runtime.trader.pause()
@@ -257,6 +275,7 @@ class CloudApp:
                     value, code = self.runtime.backtest(), 202
                 self.store.finish(user['name'], key, code, value)
             self.cache.invalidate()
+            self.experiment_cache.invalidate()
             return respond(code, value)
         except Exception:
             LOG.exception('Hosted paper operation failed; request_id=%s', request_id)
@@ -295,6 +314,7 @@ def create_app(settings=None, runtime=None, control_path=None):
         backups.start()
         watchdog = WorkerWatchdog(runtime.trader, lambda: os.kill(os.getpid(), signal.SIGTERM))
         watchdog.start()
+        app.experiment.restore()
     except Exception:
         if runtime is not None:
             runtime.close()
@@ -304,6 +324,7 @@ def create_app(settings=None, runtime=None, control_path=None):
     app.watchdog = watchdog
     def close():
         watchdog.close()
+        app.experiment.close()
         runtime.close()
         backups.close()
         lock.close()

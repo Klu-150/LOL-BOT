@@ -33,6 +33,7 @@ jobs:
           node dashboard/platform-checks.mjs
           node dashboard/terminal-analytics-checks.mjs
           node dashboard/worker-message-checks.mjs
+          node dashboard/account-checks.mjs
           node dashboard/interaction-checks.mjs
           node dashboard/privacy-checks.mjs
           node dashboard/build-release.mjs

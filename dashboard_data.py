@@ -57,7 +57,7 @@ def paper_snapshot(path):
                   "trades": trades, "decisions": decisions, "notes": notes})
 
 
-def build_snapshot(root=ROOT):
+def build_snapshot(root=ROOT, account_path=None, policy=None, automation_path=None):
     root = Path(root)
     primary = root / "results" / "results.json"
     report_files = [primary, *sorted(set([*root.glob("results/*/results.json"),
@@ -88,7 +88,7 @@ def build_snapshot(root=ROOT):
     market["date"] = market["date"].dt.strftime("%Y-%m-%d")
     columns = ["date", "open", "high", "low", "close", "vix", "ema_fast", "ema_slow", "adx", "ivr", "realized_vol", "trend", "iv"]
     try:
-        intraday_path = root / C.INTRADAY_DB
+        intraday_path = Path(account_path) if account_path is not None else root / C.INTRADAY_DB
         if intraday_path.is_file():
             from ledger_store import snapshot as intraday_snapshot
             paper = intraday_snapshot(intraday_path)
@@ -108,6 +108,8 @@ def build_snapshot(root=ROOT):
             paper["trades"] = closed
             paper["decisions"] = [{**row, "day": row["timestamp"], "equity": row["equity_rs"], "unrealised": 0}
                                   for row in paper["decisions"]]
+        elif account_path is not None:
+            paper = {"available": False, "initial_capital_rs": 500000, "trades": [], "decisions": [], "notes": []}
         else:
             paper = paper_snapshot(root / "paper" / "account.sqlite3")
     except (sqlite3.Error, ValueError, TypeError, KeyError) as exc:
@@ -130,19 +132,44 @@ def build_snapshot(root=ROOT):
             intraday.update(available=True, bars=bars[intraday_columns].to_dict('records'), latest_bar=observed.index[-1].isoformat(),
                             condition=pick.condition, volatility=pick.volatility, candidate=pick.strategy, reason=pick.reason,
                             vix_source=str(latest.vix_source))
+            if pick.strategy and paper.get('available'):
+                import risk
+                from intraday_engine import expiry_timestamp
+                years=max((expiry_timestamp(observed.index[-1])-observed.index[-1]).total_seconds(),60)/(365*86400)
+                quote=risk.entry_quote(pick.strategy,float(latest.Close),years,float(latest.VIX)/100)
+                equity=paper['realised_equity_rs'];fraction=policy['risk_fraction'] if policy else C.RISK_PER_TRADE
+                cap=policy['max_lots'] if policy else C.MAX_LOTS
+                daily_fraction=policy['daily_loss_fraction'] if policy else C.INTRADAY_DAILY_LOSS_LIMIT
+                daily_remaining=max(0,paper.get('session_equity',equity)*daily_fraction+equity-paper.get('session_equity',equity))
+                risk_lots=max(0,math.floor(equity*fraction/quote['risk_estimate_rs']))
+                day_lots=max(0,math.floor(daily_remaining/quote['risk_estimate_rs']))
+                selected=min(risk_lots,day_lots,cap)
+                intraday['lot_sizing']={'as_of':observed.index[-1].isoformat(),'strategy':pick.strategy,
+                    'risk_per_lot_rs':quote['risk_estimate_rs'],'risk_budget_rs':equity*fraction,
+                    'daily_remaining_rs':daily_remaining,'risk_limited_lots':risk_lots,'lot_cap':cap,
+                    'selected_lots':selected,'reserved_risk_rs':selected*quote['risk_estimate_rs'],
+                    'binding_limit':'risk_budget' if risk_lots<=min(day_lots,cap) else 'daily_budget' if day_lots<=cap else 'lot_cap',
+                    'quote_filter':risk.entry_filter(pick.strategy,quote,'adaptive_regime'),
+                    'illustration_only':True,'broker_margin_available':False}
         except (ValueError, OSError, KeyError) as exc:
             warnings.append(f"Intraday data unavailable: {exc}")
-    runtime_path = root / 'paper' / 'intraday_runtime.json'
+    runtime_path = Path(automation_path) if automation_path is not None else root / 'paper' / 'intraday_runtime.json'
     runtime = json.loads(runtime_path.read_text()) if runtime_path.is_file() else {"enabled": False, "state": "stopped"}
-    return clean({"schema_version": 1, "bot_name": C.BOT_NAME, "intraday": intraday, "automation": runtime,
+    result=clean({"schema_version": 1, "bot_name": C.BOT_NAME, "intraday": intraday, "automation": runtime,
                   "generated_at": datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(),
                   "market_as_of": market.iloc[-1]["date"], "reports": reports,
                   "market": market[columns].to_dict("records"), "paper": paper, "warnings": warnings,
                   "settings": {name: getattr(C, name) for name in
                                ("RISK_PER_TRADE", "MAX_LOTS", "MAX_ACCOUNT_DRAWDOWN", "SPREAD_WIDTH", "MIN_IV_RANK",
-                                "MIN_IV_RV_RATIO", "CREDIT_TAKE_PROFIT", "CREDIT_STOP_MULT", "LOT_SIZE")},
+                                "MIN_IV_RV_RATIO", "CREDIT_TAKE_PROFIT", "CREDIT_STOP_MULT", "LOT_SIZE", "INTRADAY_MAX_TRADES", "INTRADAY_DAILY_LOSS_LIMIT", "INTRADAY_COOLDOWN_MINUTES")},
                   "trading_plan": (root / "TRADING_PLAN.md").read_text() if (root / "TRADING_PLAN.md").is_file() else "",
                   "pricing": "Modelled option prices and fills. Daily closes. No broker orders."})
+    if policy:
+        result['paper_profile']=policy
+        result['settings'].update(RISK_PER_TRADE=policy['risk_fraction'],MAX_LOTS=policy['max_lots'],
+            MAX_ACCOUNT_DRAWDOWN=policy['max_drawdown'],INTRADAY_MAX_TRADES=policy['max_entries'],
+            INTRADAY_COOLDOWN_MINUTES=policy['cooldown_minutes'],INTRADAY_DAILY_LOSS_LIMIT=policy['daily_loss_fraction'],CREDIT_TAKE_PROFIT=policy['target_fraction'])
+    return result
 
 
 def export_snapshot(path):

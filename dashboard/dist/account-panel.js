@@ -1,0 +1,28 @@
+// Read-only account accounting and route diagnostics. Never creates fills.
+const finite=Number.isFinite;
+const e=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const n=(v,d=0)=>finite(v)?new Intl.NumberFormat('en-IN',{maximumFractionDigits:d,minimumFractionDigits:d}).format(v):'—';
+const money=v=>finite(v)?(v<0?'−':'')+'₹'+n(Math.abs(v),2):'—';
+const title=v=>String(v||'No trade').replaceAll('_',' ');
+export function accountValues(snapshot){
+ const p=snapshot.paper||{},available=p.available===true,position=p.position;
+ return {available,initial:available?p.initial_capital_rs:null,equity:available?p.marked_equity_rs:null,
+  closed:available?p.net_closed_pnl_rs:null,open:available?(position?.mark?.net_pnl_rs??(position?null:0)):null,
+  total:available&&finite(p.marked_equity_rs)&&finite(p.initial_capital_rs)?p.marked_equity_rs-p.initial_capital_rs:null,
+  trades:available?p.closed_trades:null,orders:available?(p.orders||[]).length:null};
+}
+export function accountPanel(snapshot,mode,requested='baseline',supported=false){
+ const p=snapshot.paper||{},v=accountValues(snapshot),policy=snapshot.paper_profile,experimental=policy?.id==='adaptive25',sizing=snapshot.intraday?.lot_sizing;
+ const source=['cloud','local'].includes(mode)?'CONNECTED ACCOUNT':mode==='snapshot'?'SAVED SNAPSHOT':'DISCONNECTED · LAST LOADED ACCOUNT';
+ const cards=[['Total account P&L',v.total],['Realised net P&L',v.closed],['Open trade net P&L',v.open],['Marked virtual equity',v.equity]];
+ const decisions=p.decisions||[],routes=['bull_call_spread','bull_put_spread','bear_put_spread','bear_call_spread','iron_condor'];
+ const trades=p.trades||[],last=trades.find(t=>t.status==='closed');
+ return `<section class="account-monitor panel"><div class="account-monitor-head"><div><span class="pro-kicker">${source}</span><h2>${experimental?'25% RISK · EXPERIMENTAL PAPER ACCOUNT':'ORIGINAL PAPER ACCOUNT'}</h2></div><label>View account<select id="paper-profile" ${supported?'':'disabled'} title="Connect to the hosted engine to switch accounts"><option value="baseline" ${requested==='baseline'?'selected':''}>Original · 2% risk</option><option value="adaptive25" ${requested==='adaptive25'?'selected':''}>Experiment · 25% risk</option></select></label></div>
+ ${experimental?'<div class="experiment-warning"><strong>HIGH-RISK VIRTUAL EXPERIMENT</strong>25% of current equity may be reserved as full estimated spread loss per entry. 25% daily loss budget; 30% drawdown halt threshold. This can lose capital rapidly. Historical model test lost approximately ₹1,53,628; higher lot counts did not create an edge.</div>':''}
+ ${requested==='adaptive25'&&!experimental?'<div class="experiment-warning">The experimental account is not connected. These loaded records belong to the original account. Connect your hosted engine to inspect the separate experiment.</div>':''}
+ <div class="account-pnl-grid">${cards.map(([label,value])=>`<div><span>${label}</span><strong class="${finite(value)?value<0?'negative':label.includes('P&L')?'positive':'':''}">${money(value)}</strong></div>`).join('')}</div>
+ <div class="account-ledger-line"><span>Initial virtual capital <b>${money(v.initial)}</b></span><span>Completed trades <b>${n(v.trades)}</b></span><span>Recorded leg fills <b>${n(v.orders)}</b></span><span>${last?`Last closed: ${e(title(last.strategy))} · ${n(last.lots)} lot${last.lots===1?'':'s'} · ${money(last.exit?.net_pnl_rs)}`:v.available?'No completed trade yet':'Start/connect this account to obtain its ledger'}</span></div>
+ ${sizing?`<details class="sizing-detail"><summary>Why ${n(sizing.selected_lots)} lot${sizing.selected_lots===1?'':'s'}? <span>${e(title(sizing.binding_limit))} is the current sizing limit</span></summary><div class="sizing-grid"><span>Risk budget <b>${money(sizing.risk_budget_rs)}</b></span><span>Full loss + costs / lot <b>${money(sizing.risk_per_lot_rs)}</b></span><span>Budget affords <b>${n(sizing.risk_limited_lots)} lots</b></span><span>Lot ceiling <b>${n(sizing.lot_cap)}</b></span><span>Daily risk remaining <b>${money(sizing.daily_remaining_rs)}</b></span><span>Illustrated risk reserve <b>${money(sizing.reserved_risk_rs)}</b></span></div><p>Illustration for ${e(title(sizing.strategy))} at ${e(sizing.as_of)}. Entry filters, freshness and session rules still apply. ${sizing.quote_filter?'Quote rejected: '+e(title(sizing.quote_filter))+'. ':''}This is estimated spread loss, not broker margin or a promise of execution.</p></details>`:''}
+ <details class="route-audit"><summary>Intraday strategy audit <span>Each completed 5m bar is reassessed using completed 15m bias</span></summary><div class="table-scroll"><table class="data-table"><thead><tr><th>Structure</th><th>Candidate observations</th><th>Opened trades</th></tr></thead><tbody>${routes.map(r=>`<tr><td>${e(title(r))}</td><td>${n(decisions.filter(d=>d.candidate===r).length)}</td><td>${n(trades.filter(t=>t.strategy===r).length)}</td></tr>`).join('')}</tbody></table></div><p>Counts cover the loaded account history, not just today. A candidate is not an order. ${experimental?'A different qualifying candidate must be confirmed on two completed 5m observations before replacement; exits and a cooldown precede re-entry.':'Existing positions keep their exit rules; a full reversal or range breakout can invalidate them. The original policy is preserved.'}</p></details>
+ <div class="pro-panel-foot">Net trade P&L includes stored model fees. Total account P&L = marked equity − initial capital. Snapshots do not confirm current server activity. Option prices and fills are modelled.</div></section>`;
+}

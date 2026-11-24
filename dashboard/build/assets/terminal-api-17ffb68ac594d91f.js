@@ -1,8 +1,13 @@
 // A restarted local server has a new session token. Reconnect before each action.
 export const isLocalHost = hostname => ['localhost','127.0.0.1','::1','[::1]'].includes(hostname);
+export function accountPath(path,profile){
+ if(profile!=='adaptive25')return path;
+ return ({'/api/dashboard':'/api/experiment/dashboard','/api/status':'/api/experiment/status',
+  '/api/automation/start':'/api/experiment/start','/api/automation/pause':'/api/experiment/pause'})[path]||path;
+}
 
 export class TerminalApi {
- constructor(fetcher=(...args)=>fetch(...args),remote=false) { this.fetcher=fetcher; this.token=null;this.remote=remote;this.permissions={control:!remote};this.user=null;this.operations=null;this.supportsIdempotency=false; }
+ constructor(fetcher=(...args)=>fetch(...args),remote=false) { this.fetcher=fetcher; this.token=null;this.remote=remote;this.permissions={control:!remote};this.user=null;this.operations=null;this.supportsIdempotency=false;this.supportsExperiments=false; }
  async read(path, options={}) {
   let response;
   try { response=await this.fetcher(path,{cache:'no-store',signal:AbortSignal.timeout(8000),...options}); }
@@ -21,6 +26,7 @@ export class TerminalApi {
   if(this.remote){
    if(health.status!=='ok'||health.mode!=='paper'||health.execution!=='cloud')throw new Error('This address is not a supported hosted paper engine.');
    this.permissions=health.permissions||{control:false};this.user=health.user||null;this.operations=health.operations||null;this.supportsIdempotency=health.capabilities?.idempotency===true;
+   this.supportsExperiments=health.capabilities?.paper_experiments===true;
    return health.automation||{};
   }
   if(health.status!=='ok'||health.mode!=='paper'||typeof health.session_token!=='string'||!health.session_token)

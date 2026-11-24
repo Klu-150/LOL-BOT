@@ -9,7 +9,7 @@ import * as originalPrivacy from './dist/privacy-center.js';
 import * as originalMobile from './dist/mobile-app.js';
 const root=fileURLToPath(new URL('./build',import.meta.url));
 const report=await validateRelease(root);
-assert.equal(report.files.length,28);
+assert.equal(report.files.length,29);
 const stage=await fs.mkdtemp(path.join(os.tmpdir(),'league-release-check-'));
 try{
  await fs.cp(root,stage,{recursive:true});

@@ -1,3 +1,5 @@
+import {accountPanel} from './dist/account-panel.js';
+import {accountPath} from './dist/terminal-api.js';
 import {analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder} from './dist/terminal-analytics.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -58,7 +60,7 @@ const fetcher=async path=>{
  throw new Error('unexpected '+path);
 };
 const source=fs.readFileSync(new URL('./dist/app.js',import.meta.url),'utf8').split("$('#file-input').addEventListener")[0].replace(/^import .*;\n/gm,'');
-const context=vm.createContext({location:{hash:'',hostname:'127.0.0.1'},Intl,Date,Set,Map,Number,Math,console,document,terminal,ordersView,TerminalApi,isLocalHost,CloudApi,mobilePage,mobileNav,initialiseMobile,TradingTools,initializeTheme,currentTheme,toggleTheme,analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder,fetch:fetcher,setInterval:()=>1});
+const context=vm.createContext({location:{hash:'',hostname:'127.0.0.1'},Intl,Date,Set,Map,Number,Math,console,document,terminal,ordersView,TerminalApi,isLocalHost,CloudApi,mobilePage,mobileNav,initialiseMobile,TradingTools,initializeTheme,currentTheme,toggleTheme,accountPanel,accountPath,analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder,fetch:fetcher,setInterval:()=>1});
 vm.runInContext(source+`\nglobalThis.qa={load,pollStatus,mode:()=>sourceMode,equity:()=>snapshot.paper.realised_equity_rs};`,context);
 await context.qa.load();
 assert.equal(context.qa.mode(),'local-disconnected');
@@ -77,3 +79,20 @@ await context.qa.pollStatus();
 assert.equal(context.qa.mode(),'local-disconnected');
 assert.ok(root.innerHTML.includes('Paper engine disconnected'));
 console.log('Paper controls passed server restart, session renewal, safe retry, static-server rejection, disconnect warning and automatic recovery checks.');
+
+// A slow response from an account previously selected cannot replace the new account.
+vm.runInContext(`globalThis.profileQA={select:v=>{state.paperProfile=v},api:v=>{localApi=v},snapshot:()=>snapshot,act:localAction};`,context);
+const originalSnapshot=context.profileQA.snapshot();
+let releaseDashboard;
+const slowDashboard=new Promise(resolve=>{releaseDashboard=resolve});
+const separateApi={remote:true,supportsExperiments:true,connect:async()=>({state:'original-state'}),
+ read:async path=>path==='/api/dashboard'?slowDashboard:{automation:{state:'experimental-state'}}};
+context.profileQA.api(separateApi);
+const pendingLoad=context.qa.load();
+await new Promise(resolve=>setImmediate(resolve));
+context.profileQA.select('adaptive25');
+releaseDashboard({...data,paper:{...data.paper,realised_equity_rs:123}});
+await pendingLoad;
+assert.equal(context.profileQA.snapshot(),originalSnapshot,'Old response must not overwrite selected account');
+await assert.rejects(context.profileQA.act('/api/automation/start'),/selected account/);
+console.log('Account controls reject mismatched data and discard responses after an account switch.');
