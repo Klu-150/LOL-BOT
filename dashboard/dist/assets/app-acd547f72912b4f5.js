@@ -1,9 +1,10 @@
-import {terminal,ordersView} from './terminal-41fdf28093f9a999.js';
+import {terminal,ordersView} from './terminal-a206574b6071e825.js';
 import {TerminalApi,isLocalHost} from './terminal-api-954788358d3cf4e2.js';
 import {CloudApi,mobilePage,mobileNav,initialiseMobile} from './mobile-app-ff46d89149c30098.js';
 import {StrategyWorkshop} from './strategy-workshop-8378ca6fa22333db.js';
 import {TradingTools} from './trading-tools-c832e834da67bbeb.js';
-import {initializeTheme,currentTheme,toggleTheme} from './theme-132cccc706771f04.js';
+import {initializeTheme,currentTheme,toggleTheme} from './theme-e2a65548f251d932.js';
+import {analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder} from './terminal-analytics-c88df3781ec9ac2a.js';
 initializeTheme();
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -129,14 +130,14 @@ function ordersPage(){
  const paper=snapshot.paper;
  return `${heading('Orders','Recorded BUY / SELL leg fills from your forward virtual account.','PAPER ORDER BOOK')}<div class="kpis">${kpi('Recorded paper fills',num(all.length),'<span>Opening and closing legs</span>',{iconName:'book'})}${kpi('BUY fills',num(all.filter(o=>o.side==='BUY').length),'<span>Virtual purchases / short covers</span>',{iconName:'arrowup'})}${kpi('SELL fills',num(all.filter(o=>o.side==='SELL').length),'<span>Virtual sales / long exits</span>',{iconName:'chart'})}${kpi('Open positions',num(paper.open_trades||0),'<span>Managed by the strategy engine</span>',{iconName:'layers'})}</div><section class="panel"><div class="panel-header"><div><h2 class="panel-title">Paper order history</h2><p class="panel-subtitle">Prices come from stored model fills · no broker submissions or resting orders</p></div><button class="btn" data-action="export-orders">${icon('download')}Export orders</button></div><div class="toolbar order-filters"><div class="toolbar-left"><label class="inline-filter">SIDE <select id="order-side" class="select" aria-label="Order side">${['all','BUY','SELL'].map(v=>`<option value="${v}" ${state.orderSide===v?'selected':''}>${v==='all'?'All sides':v}</option>`).join('')}</select></label><label class="inline-filter">POSITION <select id="order-phase" class="select" aria-label="Opening or closing orders">${['all','OPEN','CLOSE'].map(v=>`<option value="${v}" ${state.orderPhase===v?'selected':''}>${v==='all'?'Opening & closing':v==='OPEN'?'Opening only':'Closing only'}</option>`).join('')}</select></label></div><span class="tag gray">${num(rows.length)} fills</span></div>${ordersView(paper,{e,num,money,human,date,icon},{rows:rows.slice(state.orderPage*size,(state.orderPage+1)*size),total:rows.length})}${rows.length?pagination('orders',state.orderPage,pages,rows.length,size):''}</section><div class="note-strip" style="margin-top:18px">${icon('info')}<div><strong>These are paper fills, not exchange orders.</strong> The engine records a BUY or SELL for each option leg at entry and the opposite side when closing. Missing fill records are never reconstructed from current prices.</div></div>${(paper.order_warnings||[]).map(w=>`<p class="coverage">${e(w)}</p>`).join('')}`;
 }
-function terminalPage(){return terminal({snapshot,state,icon,e,num,money,pct,human,date,chart,sourceMode,automation,controlAllowed:!cloudSession||!!localApi.permissions.control});}
+function terminalPage(){return terminal({snapshot,state,icon,e,num,money,pct,human,date,chart,sourceMode,automation,controlAllowed:!cloudSession||!!localApi.permissions.control})+analyticsWorkspace(snapshot,platform?.meta,{...state,proMetaError:platform?.metaError});}
 async function localAction(path){
  if(!engineConfigured())throw new Error('Connect your hosted paper engine in the App tab to use remote controls.');
  try{const data=await localApi.action(path);sourceMode=connectedMode();connectionError='';return data;}
  catch(error){disconnected(error);render();throw error;}
 }
 async function pollStatus(){
- if(!engineConfigured()||polling||state.cloudConnecting||state.view==='mobile'&&document.activeElement?.closest?.('#cloud-connect')||state.view==='strategies'&&document.activeElement?.closest?.('.strategy-studio')||['desk','options','review'].includes(state.view)&&document.activeElement?.closest?.('.platform-page'))return;
+ if(!engineConfigured()||polling||state.cloudConnecting||document.activeElement?.closest?.('.pro-panel')||state.view==='mobile'&&document.activeElement?.closest?.('#cloud-connect')||state.view==='strategies'&&document.activeElement?.closest?.('.strategy-studio')||['desk','options','review'].includes(state.view)&&document.activeElement?.closest?.('.platform-page'))return;
  polling=true;
  try{
   if(!engineConnected()){await load();return;}
@@ -163,6 +164,7 @@ function drawer(){if(!state.drawer)return '';const t=state.drawer;return `<div c
 function render(){
  charts={};
  const tradingTools=tools();
+ if(!state.proOrder){try{state.proOrder=panelOrder(localStorage.getItem('league_terminal_panels_v1'));}catch{state.proOrder=panelOrder(null);}}
  const navigation=[
   ['TRADING DESK',[['terminal','activity','Trading terminal'],['orders','book','Orders'],['strategies','layers','Automatic strategies'],['desk','shield','Risk & alerts']]],
   ['RESEARCH',[['overview','chart','Performance'],['compare','layers','Compare algorithms'],['options','grid','Options lab'],['market','activity','Market data'],['journal','book','Backtest trades'],['review','file','Trade review']]],
@@ -182,10 +184,13 @@ function render(){
  <main class="main"><header class="topbar"><div class="breadcrumbs"><button class="mobile-menu" data-action="menu" aria-label="Toggle navigation" aria-controls="workspace-navigation" aria-expanded="${navigationOpen}">${icon('menu')}</button><span class="breadcrumb-home">Workspace</span><span class="breadcrumb-slash">/</span><strong>${e(pageNames[state.view])}</strong></div>
   <div class="topbar-right"><span class="header-market">NSE <b>OPTIONS</b></span><button class="connection ${connected?'connected':sourceMode.endsWith('disconnected')?'disconnected':'saved'}" data-action="nav" data-value="mobile"><i class="dot"></i>${connectionLabel}</button><span class="topbar-sep"></span><button class="btn header-tool" data-action="nav" data-value="desk" aria-label="Alerts and risk centre">${icon('shield')}${tradingTools.store.unread()?`<b class="alert-count">${tradingTools.store.unread()}</b>`:''}</button><button class="btn header-tool theme-toggle" data-action="toggle-theme" aria-label="Switch to ${currentTheme()==='dark'?'light':'dark'} theme">${icon(currentTheme()==='dark'?'sun':'moon')}</button><button class="btn header-tool" data-action="refresh" aria-label="Refresh reports">${icon('refresh')}</button></div>
  </header><div class="content" id="workspace-content" tabindex="-1"><div class="workspace-context"><span class="context-label">${icon('shield')}PAPER WORKSPACE <span class="context-divider"></span> <span>INTRADAY · IST</span></span><label class="report-picker">Research dataset<select class="select" id="report-select" aria-label="Report set">${allReports.map((r,i)=>`<option value="${i}" ${state.report===i?'selected':''}>${e(r.label)}</option>`).join('')}</select></label></div>
+ ${terminalSafetyBar(snapshot,tradingTools.meta,sourceMode,automation,!cloudSession||!!localApi.permissions.control,!!state.controlPending)}
+ <nav class="pro-function-nav" aria-label="Terminal functions">${[['terminal','MONITOR'],['strategies','STRATEGIES'],['options','OPTIONS LAB'],['orders','ORDER BOOK'],['compare','RESEARCH'],['desk','RISK'],['mobile','CONNECT']].map(([key,label])=>`<button data-action="nav" data-value="${key}" class="${state.view===key?'active':''}">${label}</button>`).join('')}<span>NIFTY / NSE · IST</span></nav>
  ${connectionNotice()}${(pages[state.view]||overview)()}
  <footer class="footer"><span>${icon('shield')}Paper & research · modelled option prices and fills</span><a href="privacy.html">Privacy, usage & data controls</a><span>${e(report().period||'Imported results')} · Snapshot ${e(date(snapshot.generated_at.slice(0,10)))}</span></footer></div></main>${drawer()}${mobileNav(state,icon)}`;
- bindCharts();if(state.drawer){$('.details-drawer button').focus()}
+ bindCharts();bindPanelDock(document,savePanelOrder);if(state.drawer){$('.details-drawer button').focus()}
 }
+function savePanelOrder(order){state.proOrder=panelOrder(JSON.stringify(order));try{localStorage.setItem('league_terminal_panels_v1',JSON.stringify(state.proOrder));}catch{toast('Panel layout cannot be saved in this browser.');}}
 function setNavigation(open){
  navigationOpen=!!open;
  $('.sidebar')?.classList.toggle('open',navigationOpen);
@@ -315,6 +320,9 @@ document.addEventListener('click',async ev=>{const button=ev.target.closest('[da
  if(action==='disconnect-cloud'){cloudSession=null;localApi=new TerminalApi((...args)=>fetch(...args));sourceMode='cloud-disconnected';automation={};try{await load(true)}catch(error){render();toast(error.message)}return}
  if(action==='reconnect'){button.disabled=true;try{await load(true)}catch(error){toast(error.message)}finally{button.disabled=false}return}
  if(action==='auto-start'||action==='auto-pause'){if(state.controlPending)return;state.controlPending=action;button.disabled=true;try{automation=await localAction(action==='auto-start'?'/api/automation/start':'/api/automation/pause');render();toast(action==='auto-start'?'Automatic intraday paper trading enabled.':'New entries paused; open positions remain managed.');}catch(error){toast(error.message)}finally{state.controlPending=null;render()}return}
+ if(action==='pro-reset'){state.proMove=state.proIv=state.proDays=0;render();return}
+ if(action==='pro-layout-reset'){savePanelOrder(null);render();return}
+ if(action==='pro-move'){const [id,direction]=value.split(':'),order=[...state.proOrder],index=order.indexOf(id),target=index+Number(direction);if(index>=0&&target>=0&&target<order.length){[order[index],order[target]]=[order[target],order[index]];savePanelOrder(order);render();document.querySelector(`[data-value="${id}:${direction}"]`)?.focus();}return}
  if(action==='run-backtest'){button.disabled=true;try{const job=await localAction('/api/backtest/run');state.backtestId=job.id;toast('Intraday backtest running in the background.');}catch(error){toast(error.message);button.disabled=false}return}
  if(action==='show-decisions'){selectBookTab('activity',true);return}
  if(action==='watch'){state.instrument=value;render();return}if(action==='candle-timeframe'){state.candleTimeframe=value;render();return}if(action==='book-tab'){selectBookTab(value);return}
@@ -325,7 +333,8 @@ document.addEventListener('click',async ev=>{const button=ev.target.closest('[da
  if(action==='page'){const step=+button.dataset.step;if(value==='market')state.marketPage=Math.max(0,state.marketPage+step);else if(value==='orders')state.orderPage=Math.max(0,state.orderPage+step);else state.page=Math.max(0,state.page+step);render();return}if(action==='trade-detail'){state.drawer=journalRows()[+value];render();return}if(action==='close-detail'||action==='dismiss-overlay'&&ev.target===button){state.drawer=null;render();return}
 });
 document.addEventListener('change',ev=>{const el=ev.target;if(el.id==='order-side'){state.orderSide=el.value;state.orderPage=0;render()}if(el.id==='order-phase'){state.orderPhase=el.value;state.orderPage=0;render()}if(el.id==='session-select'){state.session=el.value;render()}if(el.id==='report-select'){resetReport(+el.value);render()}if(el.id==='strategy-select'){state.strategy=el.value;state.journalStrategy=el.value;render()}if(el.id==='journal-strategy'){state.journalStrategy=el.value;state.page=0;render()}if(el.id==='from-date'||el.id==='to-date'){const from=el.id==='from-date'?el.value:state.start,to=el.id==='to-date'?el.value:state.end;if(from&&to&&from>to){toast('The start date must precede the end date.');render();return}state.start=from;state.end=to;state.range='custom';state.page=state.marketPage=0;render()}});
-document.addEventListener('input',ev=>{if(ev.target.closest?.('#strategy-builder')&&workshop)workshop.capture(ev.target.closest('#strategy-builder'));});
+document.addEventListener('input',ev=>{if(ev.target.closest?.('#strategy-builder')&&workshop)workshop.capture(ev.target.closest('#strategy-builder'));if(ev.target.matches?.('[data-pro-slider]')){const output=ev.target.parentElement.querySelector('output');if(output)output.textContent=ev.target.value+(ev.target.dataset.proSlider==='proIv'?'pp':ev.target.dataset.proSlider==='proDays'?'d':'%');}});
+document.addEventListener('change',ev=>{if(ev.target.id==='pro-structure'){state.proStructure=ev.target.value;render();}if(ev.target.matches?.('[data-pro-slider]')){const key=ev.target.dataset.proSlider;if(!['proMove','proIv','proDays'].includes(key))return;state[key]=Number(ev.target.value);render();document.querySelector(`[data-pro-slider="${key}"]`)?.focus();}});
 document.addEventListener('change',async ev=>{
  if(ev.target.closest?.('#strategy-builder')&&workshop)workshop.capture(ev.target.closest('#strategy-builder'));
  if(ev.target.id==='studio-template'&&ev.target.value){workshop.fresh(ev.target.value);return;}
@@ -344,4 +353,4 @@ window.addEventListener('hashchange',()=>{const route=routeFromHash(location.has
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pollStatus()});
 window.addEventListener('online',()=>{if(engineConfigured())pollStatus();else load().catch(()=>{})});
 window.addEventListener('offline',()=>{if(engineConfigured()){disconnected(new Error('Internet connection lost. Current engine status cannot be confirmed.'));render()}});
-load().then(()=>{appInstalled=initialiseMobile();if(state.view==='mobile')render()}).catch(error=>{$('#app').innerHTML=`<div class="boot"><div class="error-card"><div class="boot-mark" style="display:inline-block">r.</div><h1>Your workspace needs a data snapshot</h1><p>${e(error.message)}</p><code>.venv/bin/python dashboard.py</code><p>Then open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>.</p></div></div>`});
+load().then(()=>{tools().loadMeta().catch(()=>{});appInstalled=initialiseMobile();if(state.view==='mobile')render()}).catch(error=>{$('#app').innerHTML=`<div class="boot"><div class="error-card"><div class="boot-mark" style="display:inline-block">r.</div><h1>Your workspace needs a data snapshot</h1><p>${e(error.message)}</p><code>.venv/bin/python dashboard.py</code><p>Then open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>.</p></div></div>`});

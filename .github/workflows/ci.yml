@@ -31,6 +31,7 @@ jobs:
           node dashboard/mobile-checks.mjs
           node dashboard/strategy-checks.mjs
           node dashboard/platform-checks.mjs
+          node dashboard/terminal-analytics-checks.mjs
           node dashboard/interaction-checks.mjs
           node dashboard/privacy-checks.mjs
           node dashboard/build-release.mjs

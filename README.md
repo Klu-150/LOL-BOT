@@ -189,3 +189,19 @@ The [Strategy Workshop](https://nifty-research-terminal.nearbydrape.chatgpt.site
 supports editable rule templates, saved drafts, JSON import/export, browser
 backtests and comparison with the adaptive baseline. Drafts are stored per
 browser and do not activate the cloud bot. See [the workshop guide](STRATEGY_WORKSHOP.md).
+
+
+## Market terminal and shared development
+
+The dashboard now uses a dark, amber market-terminal design, with model payoff
+scenarios, a strike-centred theoretical option chain, synthetic volatility surface,
+actual paper-position Greeks and a recorded execution stream. Panel order is saved
+on the device and can be changed by dragging its handle or using keyboard buttons.
+Existing paper start/pause controls remain connected to the original engine.
+Live trading, observed OI/GEX and immediate flatten are unavailable. Read
+[the terminal guide](dashboard/TERMINAL_DESIGN.md) for data and execution limits.
+
+Both developers should use a Git clone and follow [COLLABORATION.md](COLLABORATION.md):
+pull before working, make changes on a feature branch, test, commit, push and review
+a pull request. Local saves and browser strategy drafts do not automatically sync.
+GitHub source changes and publication of the running app are separate steps.

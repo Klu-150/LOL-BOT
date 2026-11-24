@@ -54,7 +54,7 @@ for(const html of [ui.desk(),ui.options(),ui.review()]){assert.ok(!html.includes
 await assert.rejects(ui.action('tools-pause'));assert.equal(paused,0);
 ui.setContext(snapshot,automation,'cloud',false);ui.store=copy;ui.month='2026-11';assert.ok(ui.review().includes('&lt;script&gt;'));assert.ok(!ui.review().includes('<script>'));
 const attrs=new Map(),storage=memory(),element={setAttribute:(k,v)=>attrs.set(k,v),getAttribute:k=>attrs.get(k)};const doc={documentElement:element,querySelector:()=>({setAttribute:()=>{}})};
-assert.equal(initializeTheme(doc,storage),'light');toggleTheme(doc,storage);assert.equal(currentTheme(doc),'dark');assert.equal(initializeTheme(doc,storage),'dark');
+assert.equal(initializeTheme(doc,storage),'dark');toggleTheme(doc,storage);assert.equal(currentTheme(doc),'light');assert.equal(initializeTheme(doc,storage),'light');
 const original=JSON.stringify(history.config),diag=researchDiagnostics(template(),history);assert.equal(JSON.stringify(history.config),original);assert.equal(diag.available,true);assert.ok(diag.training.sessions>diag.testing.sessions);assert.ok(diag.stress.trades>0);
 assert.equal(closedAnalytics([]).win_rate,null);
 const many=Array.from({length:200000},(_,i)=>({exit:{net_pnl_rs:i%2?1:-1}}));const large=closedAnalytics(many);assert.equal(large.count,200000);assert.equal(large.net,0);assert.equal(large.best,1);assert.equal(large.worst,-1);

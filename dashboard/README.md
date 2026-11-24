@@ -114,3 +114,10 @@ explicit; the UI never fabricates running status or fills. No execution rules or
 data are changed by this design release.
 
 The recovery card also shows the connected engine’s off-server backup state, last successful copy and isolated-restore verification. It keeps VM snapshot status separate and never treats an unconfirmed off-server copy as healthy.
+
+
+## Market-terminal design
+
+See [TERMINAL_DESIGN.md](TERMINAL_DESIGN.md) for the amber terminal theme,
+model analytics, browser panel controls and data/execution limitations.
+Run `node terminal-analytics-checks.mjs` alongside the existing checks.

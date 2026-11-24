@@ -30,7 +30,7 @@ async function emit(name){
 }
 const app=await emit('app.js');
 const privacy=await emit('privacy-center.js');
-const css=(await Promise.all(['styles.css','workspace.css'].map(name=>fs.readFile(path.join(dist,name),'utf8')))).join('\n');
+const css=(await Promise.all(['styles.css','workspace.css','terminal-theme.css'].map(name=>fs.readFile(path.join(dist,name),'utf8')))).join('\n');
 const cssName=`styles-${digest(css)}.css`;
 await fs.writeFile(path.join(assets,cssName),css);
 const indexPath=path.join(dist,'index.html');

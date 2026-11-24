@@ -1,3 +1,4 @@
+import {analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder} from './dist/terminal-analytics.js';
 // Pure data/format checks: no browser automation or external dependencies.
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -7,7 +8,7 @@ import {CloudApi,mobilePage,mobileNav,initialiseMobile} from './dist/mobile-app.
 import {TradingTools} from './dist/trading-tools.js';
 import {initializeTheme,currentTheme,toggleTheme} from './dist/theme.js';
 const source=fs.readFileSync(new URL('./dist/app.js',import.meta.url),'utf8').split("$('#file-input').addEventListener")[0].replace(/^import .*;\n/gm,'');
-const context=vm.createContext({location:{hash:''},Intl,Date,Set,Map,Number,Math,console,TerminalApi,isLocalHost,CloudApi,mobilePage,mobileNav,initialiseMobile,TradingTools,initializeTheme,currentTheme,toggleTheme});
+const context=vm.createContext({location:{hash:''},Intl,Date,Set,Map,Number,Math,console,TerminalApi,isLocalHost,CloudApi,mobilePage,mobileNav,initialiseMobile,TradingTools,initializeTheme,currentTheme,toggleTheme,analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder});
 vm.runInContext(source+`\nglobalThis.checks={series,stats,drawdown,selectedTrades,validateReport,escape,resetReport,state,setData(data){snapshot=data;}};`,context);
 const {checks}=context;
 const report={summary:[{strategy:'REGIME_BOT',total_rs:10,trades:4,'win_rate_%':50,max_drawdown_rs:-100}],

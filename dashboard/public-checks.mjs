@@ -1,3 +1,4 @@
+import {analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder} from './dist/terminal-analytics.js';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
@@ -11,7 +12,7 @@ const fixture=JSON.parse(fs.readFileSync(new URL('./dist/data.json',import.meta.
 fixture.paper.decisions=[{timestamp:'2026-11-16T10:55:00+05:30',action:'skip',condition:'rising',candidate:'bull_put_spread',reason:'waiting_for_5m_bullish_trigger',equity_rs:500000}];
 for(const hash of ['#terminal/activity','#activity']){
  const root={innerHTML:''},calls=[];
- const context=vm.createContext({location:{hash,hostname:'nifty-research-terminal.nearbydrape.chatgpt.site'},Intl,Date,Set,Map,Number,Math,console,TerminalApi,isLocalHost,CloudApi,mobilePage,mobileNav,initialiseMobile,TradingTools,initializeTheme,currentTheme,toggleTheme,terminal,ordersView,document:{querySelector:()=>root,querySelectorAll:()=>[]},fetch:async path=>{
+ const context=vm.createContext({location:{hash,hostname:'nifty-research-terminal.nearbydrape.chatgpt.site'},Intl,Date,Set,Map,Number,Math,console,TerminalApi,isLocalHost,CloudApi,mobilePage,mobileNav,initialiseMobile,TradingTools,initializeTheme,currentTheme,toggleTheme,analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder,terminal,ordersView,document:{querySelector:()=>root,querySelectorAll:()=>[]},fetch:async path=>{
   calls.push(path);assert.equal(path,'data.json','Public pages must not call a loopback API');
   return {ok:true,json:async()=>structuredClone(fixture)};
  }});

@@ -9,7 +9,7 @@ import * as originalPrivacy from './dist/privacy-center.js';
 import * as originalMobile from './dist/mobile-app.js';
 const root=fileURLToPath(new URL('./build',import.meta.url));
 const report=await validateRelease(root);
-assert.equal(report.files.length,27);
+assert.equal(report.files.length,28);
 const stage=await fs.mkdtemp(path.join(os.tmpdir(),'league-release-check-'));
 try{
  await fs.cp(root,stage,{recursive:true});
@@ -42,6 +42,8 @@ assert.deepEqual(actual,expected,'The shipped backtest must produce exactly the 
 const privacy=await built('privacy-center');
 assert.equal(privacy.privacyPage(),originalPrivacy.privacyPage());
 const mobile=await built('mobile-app');
+const terminal=await built('terminal-analytics');
+assert.deepEqual(terminal.panelOrder('["log","chain","surface","payoff"]'),['log','chain','surface','payoff']);
 assert.equal(mobile.serverOrigin('https://engine.example'),originalMobile.serverOrigin('https://engine.example'));
 for(const value of ['http://engine.example','https://user:secret@engine.example','https://engine.example/?key=bad'])assert.throws(()=>mobile.serverOrigin(value));
 console.log(`Release gates passed credential/map/private-file/symlink/tamper rejection and emitted-module parity (${actual.trades.length} modelled research trades).`);

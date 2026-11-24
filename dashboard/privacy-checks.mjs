@@ -6,15 +6,17 @@ const memory=new Map([
  ['league_tools_v1',JSON.stringify({notes:{test:{text:'Private தமிழ் note'}}})],
  ['league_strategy_library_v1','{"version":1,"items":[]}'],
  ['league_theme_v2','dark'],['league_cloud_server','https://example.com'],
+ ['league_terminal_panels_v1','["log","chain","payoff","surface"]'],
  ['unrelated_host_cookie','preserve'],['private_access_key','NEVER_EXPORT']
 ]);
 const storage={getItem:key=>memory.has(key)?memory.get(key):null,removeItem:key=>memory.delete(key),setItem:(key,value)=>memory.set(key,value)};
 const inventory=deviceInventory(storage);
-assert.equal(inventory.length,4);
+assert.equal(inventory.length,5);
 assert.equal(inventory[0].key,DEVICE_KEYS.strategies[0]);
 assert.equal(inventory.find(row=>row.key==='league_tools_v1').bytes,new TextEncoder().encode(memory.get('league_tools_v1')).length);
 const output=exportDeviceData(storage);
 assert.ok(output.values.league_tools_v1.includes('தமிழ்'));
+assert.ok(output.values.league_terminal_panels_v1.includes('log'));
 assert.ok(!JSON.stringify(output).includes('NEVER_EXPORT'));
 assert.ok(!Object.hasOwn(output.values,'unrelated_host_cookie'));
 assert.throws(()=>clearDeviceCategory(storage,'__proto__'));
@@ -24,6 +26,7 @@ assert.equal(storage.getItem('league_tools_v1'),null);
 assert.ok(storage.getItem('league_strategy_library_v1'));
 assert.equal(storage.getItem('league_theme_v2'),'dark');
 clearDeviceCategory(storage,'all');
+assert.equal(storage.getItem('league_terminal_panels_v1'),null);
 assert.ok(deviceInventory(storage).every(row=>!row.present));
 assert.equal(storage.getItem('unrelated_host_cookie'),'preserve');
 assert.equal(storage.getItem('private_access_key'),'NEVER_EXPORT');

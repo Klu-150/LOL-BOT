@@ -1,3 +1,4 @@
+import {analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder} from './dist/terminal-analytics.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -57,7 +58,7 @@ const fetcher=async path=>{
  throw new Error('unexpected '+path);
 };
 const source=fs.readFileSync(new URL('./dist/app.js',import.meta.url),'utf8').split("$('#file-input').addEventListener")[0].replace(/^import .*;\n/gm,'');
-const context=vm.createContext({location:{hash:'',hostname:'127.0.0.1'},Intl,Date,Set,Map,Number,Math,console,document,terminal,ordersView,TerminalApi,isLocalHost,CloudApi,mobilePage,mobileNav,initialiseMobile,TradingTools,initializeTheme,currentTheme,toggleTheme,fetch:fetcher,setInterval:()=>1});
+const context=vm.createContext({location:{hash:'',hostname:'127.0.0.1'},Intl,Date,Set,Map,Number,Math,console,document,terminal,ordersView,TerminalApi,isLocalHost,CloudApi,mobilePage,mobileNav,initialiseMobile,TradingTools,initializeTheme,currentTheme,toggleTheme,analyticsWorkspace,terminalSafetyBar,bindPanelDock,panelOrder,fetch:fetcher,setInterval:()=>1});
 vm.runInContext(source+`\nglobalThis.qa={load,pollStatus,mode:()=>sourceMode,equity:()=>snapshot.paper.realised_equity_rs};`,context);
 await context.qa.load();
 assert.equal(context.qa.mode(),'local-disconnected');
