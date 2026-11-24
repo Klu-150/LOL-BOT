@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const source=fs.readFileSync(new URL('./dist/strategy-worker.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
+class DedicatedWorkerGlobalScope{}
+const messages=[],calls=[];
+const self=new DedicatedWorkerGlobalScope();
+self.location={origin:'https://terminal.example'};
+self.postMessage=value=>messages.push(value);
+vm.runInNewContext(source,{self,DedicatedWorkerGlobalScope,runResearch:(...args)=>{calls.push(args);return {mode:'research'};}});
+assert.equal(typeof self.onmessage,'function');
+const payload={definition:{},dataset:{},range:{}};
+for(const origin of ['https://attacker.example','null',undefined])self.onmessage({origin,data:payload});
+assert.equal(calls.length,0,'Untrusted origins must not start computation or receive results');
+assert.equal(messages.length,0);
+self.onmessage({origin:'',data:payload});
+self.onmessage({origin:'https://terminal.example',data:payload});
+assert.equal(calls.length,2,'Dedicated channel and exact same origin remain supported');
+assert.equal(messages.length,2);
+const windowLike={location:self.location,postMessage:()=>{throw Error('Window messages are forbidden');}};
+vm.runInNewContext(source,{self:windowLike,DedicatedWorkerGlobalScope,runResearch:()=>{throw Error('Not a worker');}});
+assert.equal(windowLike.onmessage,undefined);
+vm.runInNewContext(source,{self:windowLike,runResearch:()=>{throw Error('No worker API');}});
+assert.equal(windowLike.onmessage,undefined);
+console.log('Research worker passed dedicated-scope, empty-channel, exact-origin and foreign-origin isolation checks.');

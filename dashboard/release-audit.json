@@ -2,9 +2,9 @@
   "schema_version": 1,
   "files": [
     {
-      "file": "assets/app-acd547f72912b4f5.js",
+      "file": "assets/app-ef866ce219aff86f.js",
       "bytes": 73272,
-      "sha256": "acd547f72912b4f5f48713152fc2b5b92a66d983436ce0f304e95cb295ee6325"
+      "sha256": "ef866ce219aff86f66b37f74014c179f0f91cc4ca8aa2bb4fd123a7980442d85"
     },
     {
       "file": "assets/execution-view-f1b717ac6ba642f9.js",
@@ -37,14 +37,14 @@
       "sha256": "251c64dd6c46807396a891bdd07bdcb8a9ff3366f575ee55a2e2756082d78536"
     },
     {
-      "file": "assets/strategy-worker-a5e6da50ba58ce26.js",
-      "bytes": 260,
-      "sha256": "a5e6da50ba58ce265e87d285564136bad8ec06a4e683a4c041fef9a89d8af59a"
+      "file": "assets/strategy-worker-184d5eb5c0df4cc5.js",
+      "bytes": 667,
+      "sha256": "184d5eb5c0df4cc59b2a7cfc8646274d085e3c73fd783752af9e7ec46ad0943d"
     },
     {
-      "file": "assets/strategy-workshop-8378ca6fa22333db.js",
+      "file": "assets/strategy-workshop-a915f8bc092b8a2a.js",
       "bytes": 22375,
-      "sha256": "8378ca6fa22333dba0788aa68cc01aba4fcc44c6dccb509bd0764f1b50973685"
+      "sha256": "a915f8bc092b8a2a7d2435079f7109422cf77eab1b22363bbd3bc4a5c4748d3d"
     },
     {
       "file": "assets/styles-7a750e7e480e444f.css",
@@ -104,7 +104,7 @@
     {
       "file": "index.html",
       "bytes": 1518,
-      "sha256": "a2a09f5723170931b9aa69585ef6de2c97b7f4c76c494d96938d3fcef1e2c471"
+      "sha256": "13c5d0e49f0f012f14ca034c2789e255632a158a8c49e5833ecffaef211b01e5"
     },
     {
       "file": "manifest.webmanifest",
@@ -134,7 +134,7 @@
     {
       "file": "sw.js",
       "bytes": 1719,
-      "sha256": "7fb91984ea65801e25063be17ceacac7f38fb8ba1e67795d640beee8e6fdfd92"
+      "sha256": "8b47f32fe4032421bc998073265f03c455a03e2870fe05468fe5f55c8ea50cf7"
     },
     {
       "file": "third-party-notices.txt",
@@ -142,7 +142,7 @@
       "sha256": "d19cb7337a515838505de8b9e6744623e36441d42856e9d8c62d402356b7be9c"
     }
   ],
-  "total_bytes": 4094991,
+  "total_bytes": 4095398,
   "checks": {
     "allowlist": true,
     "symlinks_rejected": true,

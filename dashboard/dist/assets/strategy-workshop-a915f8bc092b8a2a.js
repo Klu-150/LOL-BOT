@@ -62,7 +62,7 @@ export class StrategyWorkshop{
    const dataset=await this.loadData(),range={...this.range};
    const result=await new Promise((resolve,reject)=>{
     if(typeof Worker==='undefined'){try{resolve(runResearch(definition,dataset,range));}catch(error){reject(error);}return;}
-    const worker=new Worker(new URL('./strategy-worker-a5e6da50ba58ce26.js',import.meta.url),{type:'module'});
+    const worker=new Worker(new URL('./strategy-worker-184d5eb5c0df4cc5.js',import.meta.url),{type:'module'});
     const timer=setTimeout(()=>{worker.terminate();reject(Error('This research test exceeded 45 seconds. Try a shorter date range.'));},45000);
     worker.onmessage=event=>{clearTimeout(timer);worker.terminate();event.data.error?reject(Error(event.data.error)):resolve(event.data.result);};
     worker.onerror=()=>{clearTimeout(timer);worker.terminate();reject(Error('The research worker could not run. Refresh the page and try again.'));};
