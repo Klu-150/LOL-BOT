@@ -2,7 +2,8 @@
 // LOL Pro terminal front end. All external text (news, alerts) is inserted with textContent.
 
 const $ = (id) => document.getElementById(id);
-const S = { state: null, token: null, page: "overview", newsFilter: "all", chat: [], busy: false };
+const S = { state: null, token: null, page: "overview", newsFilter: "all", chat: [], busy: false,
+  index: "nifty50", view: "heat", stock: null, stockData: null, range: "1d" };
 const TITLES = { overview: "Overview", markets: "Markets", news: "Live news", assistant: "Assistant",
   performance: "Performance", alerts: "Alerts & health", strategy: "How it works" };
 const REGIME_LABEL = { uptrend: "Uptrend", transition: "Transition", range: "Range", downtrend: "Downtrend", stress: "Stress", warmup: "Warm-up" };
@@ -193,7 +194,66 @@ function alertRow(a) {
   return el("li", {}, el("i", { class: "lvl " + a.level }), el("div", { class: "t" }, el("b", { text: a.title }), el("span", { text: `${a.message} · ${ago(a.time)}` })));
 }
 
+function sparkline(values, up) {
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 100 30"); svg.setAttribute("class", "spark"); svg.setAttribute("aria-hidden", "true");
+  const v = (values || []).filter((x) => x != null);
+  if (v.length > 1) {
+    const lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+    const d = v.map((x, i) => `${i ? "L" : "M"}${((i * 100) / (v.length - 1)).toFixed(1)} ${(28 - ((x - lo) * 26) / span).toFixed(1)}`).join("");
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", d); path.setAttribute("fill", "none"); path.setAttribute("stroke", up ? cssVar("--up") : cssVar("--down"));
+    path.setAttribute("stroke-width", "1.6"); path.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.append(path);
+  }
+  return svg;
+}
+const S_prev = new Map();
+function flashClass(sym, price) {
+  const before = S_prev.get(sym); S_prev.set(sym, price);
+  return before == null || before === price ? "" : price > before ? " flash-up" : " flash-down";
+}
+function heatColor(p) {
+  const a = Math.min(1, Math.abs(p || 0) / 3);
+  return p >= 0 ? `color-mix(in srgb, var(--up) ${Math.round(18 + a * 62)}%, var(--surface))` : `color-mix(in srgb, var(--down) ${Math.round(18 + a * 62)}%, var(--surface))`;
+}
+
 function renderMarkets(st) {
+  const board = st.board || {}, idx = board.indices || {};
+  const open = st.market?.session?.reason === "regular_session";
+  fill($("indexCards"), Object.entries(idx).map(([key, x]) => el("button", {
+    class: "card index-card" + (S.index === key ? " on" : ""), onclick: () => { S.index = key; renderMarkets(S.state); } },
+    el("div", { class: "ic-top" }, el("span", { text: x.name }), open ? el("span", { class: "live", text: "Live" }) : el("span", { class: "muted small", text: "Closed" })),
+    el("strong", { text: num(x.price) }),
+    el("span", { class: sign(x.change_pct), text: `${x.change > 0 ? "+" : ""}${num(x.change)} (${pct(x.change_pct)})` }),
+    sparkline(x.spark, (x.change_pct || 0) >= 0),
+    el("div", { class: "ic-breadth" }, el("span", { class: "up", text: `▲ ${x.advancing ?? "—"}` }), el("span", { class: "down", text: `▼ ${x.declining ?? "—"}` }),
+      el("span", { class: "muted", text: `${x.members} companies` })))));
+  document.querySelectorAll("#indexTabs button").forEach((b) => b.classList.toggle("on", b.dataset.i === S.index));
+  const q = $("boardSearch").value.trim().toLowerCase(), sort = $("boardSort").value;
+  let list = (board.stocks || []).filter((x) => x.in.includes(S.index) && (!q || x.name.toLowerCase().includes(q) || x.symbol.toLowerCase().includes(q)));
+  const by = { change: (a, b) => b.change_pct - a.change_pct, "-change": (a, b) => a.change_pct - b.change_pct,
+    name: (a, b) => a.name.localeCompare(b.name), volume: (a, b) => (b.volume || 0) * (b.price || 0) - (a.volume || 0) * (a.price || 0) };
+  list.sort(by[sort]);
+  const when = board.updated ? new Date(board.updated).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
+  $("boardNote").textContent = `${list.length} companies · ${open ? "updates every minute while the market is open" : "market closed: showing the last traded prices"} · refreshed ${when}. Click a company for its live chart.`;
+  const flashes = new Map(list.map((x) => [x.symbol, flashClass(x.symbol, x.price)]));
+  fill($("heatmap"), list.length ? list.map((x) => el("button", {
+    class: "tile" + flashes.get(x.symbol), style: `background:${heatColor(x.change_pct)}`, title: `${x.name}: ${pct(x.change_pct)}`,
+    onclick: () => openStock(x.symbol) },
+    el("b", { text: x.symbol }), el("span", { text: num(x.price) }), el("em", { text: pct(x.change_pct) }))) :
+    el("p", { class: "muted", text: board.updated ? "No companies match." : "Loading live prices…" }));
+  fill($("boardTable").tBodies[0], list.map((x) => {
+    const span = x.high - x.low, at = span > 0 ? ((x.price - x.low) / span) * 100 : 50;
+    return el("tr", { class: "clickable", tabindex: "0", onclick: () => openStock(x.symbol), onkeydown: (e) => { if (e.key === "Enter") openStock(x.symbol); } },
+      el("td", {}, el("b", { text: x.name }), el("div", { class: "small muted", text: `${x.symbol} · ${x.industry}` })),
+      el("td", { class: "hide-sm" }, sparkline(x.spark, (x.change_pct || 0) >= 0)),
+      el("td", { class: "num" + flashes.get(x.symbol), text: num(x.price) }),
+      el("td", { class: "num " + sign(x.change_pct) }, el("div", { text: pct(x.change_pct) }), el("div", { class: "small", text: (x.change > 0 ? "+" : "") + num(x.change) })),
+      el("td", { class: "hide-sm" }, el("div", { class: "range-bar", title: `${num(x.low)} – ${num(x.high)}` }, el("i", { style: `left:calc(${at}% - 2px)` }))));
+  }));
+  $("heatmap").hidden = S.view !== "heat"; $("listWrap").hidden = S.view !== "list";
+
   const rows = st.daily_chart || [];
   lineChart($("dailyChart"), [
     { values: rows.map((r) => r.e200), color: cssVar("--c-ema200"), width: 1.5 },
@@ -202,18 +262,65 @@ function renderMarkets(st) {
   ], { labels: rows.map((r) => r.d), label: "Nifty daily with EMA 50 and EMA 200", empty: "Run the daily decision to load history" });
   fill($("regimeStrip"), rows.map((r) => el("i", { class: "r-" + r.g, title: `${r.d}: ${REGIME_LABEL[r.g] || r.g}` })));
   fill($("regimeLegend"), Object.entries(REGIME_LABEL).filter(([k]) => k !== "warmup").map(([k, v]) => el("span", {}, el("i", { class: "reg r-" + k }), " " + v)));
-  const b = st.market?.breadth;
-  $("breadth").textContent = b ? `${b.advancing} advancing · ${b.declining} declining` : "";
-  const stocks = st.market?.stocks || [];
-  fill($("stocks").tBodies[0], stocks.length ? stocks.map((s) => {
-    const span = s.high - s.low, at = span > 0 ? ((s.price - s.low) / span) * 100 : 50;
-    return el("tr", {},
-      el("td", {}, el("b", { text: s.name }), el("div", { class: "small muted", text: s.symbol.replace(".NS", "") })),
-      el("td", { class: "num", text: num(s.price) }),
-      el("td", { class: "num " + sign(s.change_pct), text: pct(s.change_pct) }),
-      el("td", { class: "hide-sm" }, el("div", { class: "range-bar", title: `${num(s.low)} – ${num(s.high)}` }, el("i", { style: `left:calc(${at}% - 2px)` }))),
-      el("td", { class: "num" }, el("button", { class: "news-btn", text: "News", onclick: () => { location.hash = "news"; $("companySelect").value = s.name; loadCompany(s.name); } })));
-  }) : el("tr", {}, el("td", { colspan: 5, class: "muted", text: "Loading quotes…" })));
+}
+
+// ------------------------------------------------------------ company detail
+let stockTimer = null;
+async function openStock(symbol) {
+  S.stock = symbol; S.stockData = null;
+  $("drawer").hidden = false; $("drawerBackdrop").hidden = false; document.body.classList.add("no-scroll");
+  const b = (S.state?.board?.stocks || []).find((x) => x.symbol === symbol);
+  $("dName").textContent = b ? b.name : symbol; $("dMeta").textContent = b ? `${symbol} · ${b.industry}` : symbol;
+  $("dPrice").textContent = b ? num(b.price) : "—"; fill($("dChart"), el("div", { class: "empty", text: "Loading live chart…" }));
+  fill($("dNews"), el("li", { class: "muted", text: "Loading…" }));
+  history.replaceState(null, "", "#markets/" + symbol);
+  loadStock(); loadStockNews(symbol);
+  clearInterval(stockTimer); stockTimer = setInterval(loadStock, 15000);
+  $("drawerClose").focus();
+}
+function closeStock() {
+  S.stock = null; clearInterval(stockTimer);
+  $("drawer").hidden = true; $("drawerBackdrop").hidden = true; document.body.classList.remove("no-scroll");
+  if (location.hash.startsWith("#markets/")) history.replaceState(null, "", "#markets");
+}
+async function loadStock() {
+  const sym = S.stock; if (!sym) return;
+  try {
+    const r = await fetch("/api/stock?symbol=" + encodeURIComponent(sym), { cache: "no-store" });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    if (S.stock !== sym) return;
+    S.stockData = d; renderStock();
+  } catch (e) { if (!S.stockData) fill($("dChart"), el("div", { class: "empty", text: "Could not load: " + e.message })); }
+}
+function renderStock() {
+  const d = S.stockData; if (!d) return;
+  const open = S.state?.market?.session?.reason === "regular_session";
+  $("dName").textContent = d.name;
+  $("dMeta").textContent = `${d.symbol} · ${d.industry} · ${d.in.map((k) => (k === "nifty50" ? "Nifty 50" : "Sensex")).join(" & ")}`;
+  $("dPrice").textContent = "₹" + num(d.price); $("dPrice").className = flashClass("detail:" + d.symbol, d.price).trim();
+  $("dChange").textContent = `${d.change > 0 ? "+" : ""}${num(d.change)} (${pct(d.change_pct)})`; $("dChange").className = sign(d.change_pct);
+  $("dLive").textContent = open ? "Live · refreshes every 15 s" : `Market closed · last trade ${d.time ? new Date(d.time).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : ""}`;
+  $("dLive").className = open ? "live" : "muted small";
+  const color = (d.change_pct || 0) >= 0 ? cssVar("--up") : cssVar("--down");
+  if (S.range === "1y") {
+    lineChart($("dChart"), [{ values: d.daily.map((x) => x.c), color: cssVar("--c-price"), area: true }], { labels: d.daily.map((x) => x.d), label: d.name + " one year" });
+  } else {
+    lineChart($("dChart"), [{ values: d.intraday.map((x) => x.c), color, area: true }], {
+      labels: d.intraday.map((x) => x.t), label: d.name + " today", refs: d.prev_close ? [{ y: d.prev_close, color: cssVar("--muted"), label: "prev close " + num(d.prev_close) }] : [] });
+  }
+  fill($("dStats"), [["Open", num(d.open)], ["Prev close", num(d.prev_close)], ["Day high", num(d.high)], ["Day low", num(d.low)],
+    ["Volume", d.volume != null ? Number(d.volume).toLocaleString("en-IN") : "—"], ["52-wk high", num(d.w52_high)]]
+    .map(([k, v]) => el("div", {}, el("span", { text: k }), el("b", { text: v }))));
+  const span = d.w52_high - d.w52_low;
+  $("d52").style.left = `calc(${span > 0 ? ((d.price - d.w52_low) / span) * 100 : 50}% - 2px)`;
+  $("d52lo").textContent = "Low " + num(d.w52_low); $("d52hi").textContent = "High " + num(d.w52_high);
+}
+async function loadStockNews(symbol) {
+  try {
+    const r = await fetch("/api/company-news?symbol=" + encodeURIComponent(symbol));
+    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    if (S.stock === symbol) fill($("dNews"), d.items.length ? d.items.slice(0, 10).map(newsItem) : el("li", { class: "muted", text: "No recent news." }));
+  } catch (e) { fill($("dNews"), el("li", { class: "muted", text: "News unavailable: " + e.message })); }
 }
 
 function renderNews(st) {
@@ -235,9 +342,9 @@ function renderNews(st) {
     el("li", {}, el("i", { class: "lvl " + (errs[s] ? "error" : "trade") }), el("div", { class: "t", text: errs[s] ? `${s}: unavailable` : `${s}: live` }))),
     el("li", { class: "muted", text: `Refreshed ${ago(st.health?.news_updated)} · every 2 minutes` }));
   const sel = $("companySelect");
-  if (!sel.options.length) {
-    sel.append(el("option", { value: "", text: "Choose a company…" }));
-    for (const s of [...(st.market?.stocks || [])].sort((a, b) => a.name.localeCompare(b.name))) sel.append(el("option", { value: s.name, text: s.name }));
+  if (sel.options.length <= 1 && st.board?.stocks?.length) {
+    fill(sel, el("option", { value: "", text: "Choose a company…" }),
+      st.board.stocks.map((s) => el("option", { value: s.symbol, text: `${s.name} (${s.symbol})` })));
   }
 }
 function newsItem(i) {
@@ -247,11 +354,11 @@ function newsItem(i) {
       i.impact >= 3 ? el("span", { class: "tag impact", text: i.macro ? "macro · high impact" : "high impact" }) : null,
       ...(i.companies || []).map((c) => el("span", { class: "tag co", text: c }))));
 }
-async function loadCompany(name) {
-  if (!name) return;
+async function loadCompany(symbol) {
+  if (!symbol) return;
   fill($("companyNews"), el("li", { class: "muted", text: "Loading…" }));
   try {
-    const r = await fetch("/api/company-news?name=" + encodeURIComponent(name));
+    const r = await fetch("/api/company-news?symbol=" + encodeURIComponent(symbol));
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
     fill($("companyNews"), d.items.length ? d.items.slice(0, 15).map(newsItem) : el("li", { class: "muted", text: "No recent news." }));
@@ -347,14 +454,16 @@ async function ask(text) {
 
 // ---------------------------------------------------------------- routing
 function route() {
-  const page = (location.hash || "#overview").slice(1);
+  const [page, sub] = (location.hash || "#overview").slice(1).split("/");
   S.page = TITLES[page] ? page : "overview";
+  if (S.page === "markets" && sub && sub !== S.stock) setTimeout(() => openStock(sub.toUpperCase()), 0);
+  if (S.page !== "markets" && S.stock) closeStock();
   for (const p of Object.keys(TITLES)) $("page-" + p).hidden = p !== S.page;
   document.querySelectorAll("[data-page]").forEach((a) => a.classList.toggle("on", a.dataset.page === S.page));
   $("pageTitle").textContent = TITLES[S.page];
   if (S.page === "alerts" && S.state?.alerts?.some((a) => !a.read)) post("/api/alerts/read").then(load).catch(() => {});
   render();
-  window.scrollTo(0, 0);
+  if (!sub) window.scrollTo(0, 0);
 }
 
 function init() {
@@ -386,6 +495,19 @@ function init() {
     catch (e) { $("runMsg").textContent = "Failed: " + e.message; }
     $("runDaily").disabled = false; load();
   };
+  $("indexTabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { S.index = b.dataset.i; renderMarkets(S.state || {}); } });
+  $("viewTabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return; S.view = b.dataset.v;
+    document.querySelectorAll("#viewTabs button").forEach((x) => x.classList.toggle("on", x === b)); renderMarkets(S.state || {});
+  });
+  $("boardSearch").addEventListener("input", () => renderMarkets(S.state || {}));
+  $("boardSort").addEventListener("change", () => renderMarkets(S.state || {}));
+  $("rangeTabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return; S.range = b.dataset.r;
+    document.querySelectorAll("#rangeTabs button").forEach((x) => x.classList.toggle("on", x === b)); renderStock();
+  });
+  $("drawerClose").onclick = closeStock; $("drawerBackdrop").onclick = closeStock;
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.stock) closeStock(); });
   window.addEventListener("hashchange", route);
   let resize; window.addEventListener("resize", () => { clearTimeout(resize); resize = setTimeout(render, 150); });
   chatRender(); route(); load();

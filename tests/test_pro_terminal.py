@@ -32,8 +32,15 @@ def test_risk_rises_with_recent_negative_macro_news():
     now = datetime.now(timezone.utc)
     item = lambda t, h=1: {"title": t, "published": (now - timedelta(hours=h)).isoformat(), **dict(zip(("sentiment", "impact", "macro"), news._score(t)))}
     calm = [item("Nifty ends flat"), item("Markets rise on strong earnings")]
-    panic = [item("Sensex crashes as war fears grip markets"), item("FPI outflows deepen, rupee plunges to record low"),
-             item("Global sell-off: Nasdaq tumbles on recession fears"), item("Crude spikes after attack, markets plunge")]
+    panic = [item(t) for t in ("Sensex crashes 2,000 points as war fears grip markets", "FPI outflows deepen, rupee plunges to record low",
+             "Global sell-off: Nasdaq tumbles on recession fears", "Crude spikes after attack, markets plunge",
+             "Nifty sinks 4%, biggest fall since 2020 as panic selling hits", "Bank stocks crash as RBI rate hike shocks market",
+             "Investors lose Rs 10 lakh crore in market bloodbath", "India VIX surges 30% as war escalates, Sensex tumbles")]
+    opinion = [item(t) for t in ("If a stock market crash is coming, here is the smartest move",
+               "Investors must brace for deeper market corrections, warn fund managers", "Sensex, Nifty end four-week rally as rupee weakens",
+               "Smallcap stocks that plunged the most in a year", "Is a crash coming?", "Gold is less volatile despite the correction")]
+    assert news.risk(opinion)["level"] != "high"  # opinion pieces alone must never block trades
+    assert news.risk(panic[:4])["level"] != "high"
     old_panic = [item(i["title"], 10) for i in panic]
     assert news.risk(calm)["level"] == "normal"
     assert news.risk(panic)["level"] == "high"
@@ -147,3 +154,34 @@ def test_server_rejects_unauthenticated_posts(tmp_path, monkeypatch):
         assert urllib.request.urlopen(base + "/").read().startswith(b"<!doctype html>")
     finally:
         httpd.shutdown()
+
+
+# ------------------------------------------------------------ constituents
+def test_index_lists_are_complete():
+    from pro import constituents
+    members, info = constituents.load_lists()
+    assert len(members["nifty50"]) == 50 and len(set(members["nifty50"])) == 50
+    assert len(members["sensex30"]) == 30 and set(members["sensex30"]) <= set(info)
+    assert all(i["name"] and i["industry"] for i in info.values())
+
+
+def test_quote_maths_and_sparkline_thinning():
+    from pro import constituents
+    meta = {"regularMarketPrice": 110.0, "chartPreviousClose": 100.0, "regularMarketDayHigh": 112, "regularMarketDayLow": 99,
+            "regularMarketTime": 1795773550}
+    q = constituents._quote(meta, [(1795770000 + 60 * i, 100 + i * 0.1) for i in range(375)])
+    assert q["change"] == 10.0 and q["change_pct"] == 10.0
+    assert len(q["spark"]) <= 49 and q["spark"][-1] == round(100 + 374 * 0.1, 2)
+
+
+def test_board_snapshot_counts_breadth(monkeypatch):
+    from pro import constituents
+    board = constituents.IndexBoard()
+    syms = list(board.info)
+    board.quotes = {s: {"price": 10, "change_pct": 1.0 if i % 3 else -1.0, "change": 0.1, "spark": []} for i, s in enumerate(syms)}
+    snap = board.snapshot()
+    n = snap["indices"]["nifty50"]
+    assert n["advancing"] + n["declining"] == 50 and len(snap["stocks"]) == 50
+    assert snap["indices"]["sensex30"]["members"] == 30
+    with pytest.raises(KeyError):
+        board.detail("NOT-A-STOCK")

@@ -1,4 +1,6 @@
-"""Live market snapshot: Nifty, India VIX, today's 5-minute path, and heavyweight stocks.
+"""Live market snapshot: Nifty, India VIX and today's 5-minute Nifty path.
+
+Constituent stocks live in pro/constituents.py (Nifty 50 and Sensex 30 board).
 
 Public Yahoo research data (delayed, unofficial). Read-only; no orders.
 """
@@ -9,7 +11,6 @@ from zoneinfo import ZoneInfo
 
 import intraday_feed
 from exchange_calendar import session_status
-from pro.news import COMPANIES
 
 ZONE = ZoneInfo("Asia/Kolkata")
 
@@ -40,28 +41,15 @@ class MarketDesk:
             # One request per instrument at a time (the transport's circuit breaker is per symbol).
             jobs["nifty"] = pool.submit(_quote, "^NSEI")
             jobs["vix"] = pool.submit(_quote, "^INDIAVIX")
-            for sym, name, _ in COMPANIES:
-                jobs[sym] = pool.submit(_quote, sym)
         try:
             data["nifty_intraday"] = _intraday("^NSEI")
         except Exception as exc:
             errors["nifty_intraday"] = str(exc)[:200]
-        stocks = []
         for key, job in jobs.items():
             try:
-                value = job.result()
+                data[key] = job.result()
             except Exception as exc:
                 errors[key] = str(exc)[:200]
-                continue
-            if key.endswith(".NS"):
-                value["name"] = next(n for s, n, _ in COMPANIES if s == key)
-                stocks.append(value)
-            else:
-                data[key] = value
-        if stocks:
-            up = sum(1 for s in stocks if s["change_pct"] > 0)
-            data["stocks"] = sorted(stocks, key=lambda s: s["change_pct"], reverse=True)
-            data["breadth"] = {"advancing": up, "declining": len(stocks) - up, "total": len(stocks)}
         now = datetime.now(ZONE)
         data["session"] = session_status(now)
         with self._lock:

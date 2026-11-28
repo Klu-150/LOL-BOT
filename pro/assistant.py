@@ -44,6 +44,9 @@ def _context(state):
         "options_account": state.get("options_account"),
         "etf_comparison_account": state.get("etf_account"),
         "market": {k: v for k, v in (state.get("market") or {}).items() if k != "nifty_intraday"},
+        "indices": (state.get("board") or {}).get("indices"),
+        "constituents": [{k: s.get(k) for k in ("symbol", "name", "price", "change_pct", "in")}
+                         for s in (state.get("board") or {}).get("stocks", [])],
         "nifty_intraday_last": (state.get("market") or {}).get("nifty_intraday", [])[-12:],
         "news_risk": news.get("risk"),
         "headlines": [{k: i[k] for k in ("title", "source", "published", "sentiment", "impact", "companies")}
@@ -109,11 +112,17 @@ def fallback(question, state):
     n, v = mkt.get("nifty") or {}, mkt.get("vix") or {}
     parts = []
     if any(w in q for w in ("market", "nifty", "today", "running", "index", "vix")):
-        b = mkt.get("breadth") or {}
+        idx = (state.get("board") or {}).get("indices") or {}
+        nf, sx = idx.get("nifty50") or {}, idx.get("sensex30") or {}
         parts.append(f"Nifty {n.get('price', '—')} ({n.get('change_pct', 0):+.2f}% on {n.get('as_of', '—')}), "
                      f"India VIX {v.get('price', '—')} ({v.get('change_pct', 0):+.2f}%). "
-                     f"Heavyweights: {b.get('advancing', '—')} up / {b.get('declining', '—')} down. "
                      f"The engine reads the regime as **{plan.get('regime', 'unknown')}** (ADX {plan.get('adx', '—')}).")
+        if nf:
+            parts.append(f"Nifty 50 breadth: {nf.get('advancing')} up / {nf.get('declining')} down; top gainers "
+                         f"{', '.join(nf.get('gainers', []))}; top losers {', '.join(nf.get('losers', []))}.")
+        if sx:
+            parts.append(f"Sensex {sx.get('price', '—')} ({(sx.get('change_pct') or 0):+.2f}%), "
+                         f"{sx.get('advancing')} up / {sx.get('declining')} down.")
     if any(w in q for w in ("position", "holding", "spread", "open", "buy", "sell", "doing")) or ("trade" in q and "real" not in q):
         pos = opt.get("position")
         if pos:

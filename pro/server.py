@@ -19,8 +19,9 @@ import traceback
 from data import ROOT
 from exchange_calendar import HOLIDAYS, REVIEWED_YEARS
 from pro import alerts, assistant, daily, live, trial
+from pro.constituents import IndexBoard
 from pro.market import MarketDesk, ZONE
-from pro.news import COMPANIES, NewsDesk
+from pro.news import NewsDesk
 
 WEB = Path(__file__).resolve().parent / "web"
 STATIC = {"/": ("index.html", "text/html; charset=utf-8"), "/app.js": ("app.js", "text/javascript; charset=utf-8"),
@@ -39,6 +40,8 @@ def _read_json(path, default=None):
 class Engine:
     def __init__(self, notify=True):
         self.market, self.news, self.alerts = MarketDesk(), NewsDesk(), alerts.AlertCenter(notify=notify)
+        self.board = IndexBoard()
+        self._last_board = 0.0
         self.token = secrets.token_urlsafe(24)
         self.health = {"started": datetime.now(ZONE).isoformat(), "daily": {}, "market_failures": 0, "loops": {}}
         self._job_lock, self._stop = threading.Lock(), threading.Event()
@@ -97,6 +100,14 @@ class Engine:
             self.health["market_failures"] += 1
             log.warning("market refresh failed: %s", exc)
 
+    def refresh_board(self):
+        try:
+            with self._feed_lock:
+                self.board.refresh()
+            self._last_board = time.monotonic()
+        except Exception as exc:
+            log.warning("constituent refresh failed: %s", exc)
+
     def refresh_news(self):
         try:
             snap = self.news.refresh()
@@ -132,6 +143,8 @@ class Engine:
         if risk.get("level") == "high":
             self.alerts.raise_alert("news_risk", "warning", "High market news risk",
                                     f"News risk {risk.get('score')}/100: new entries are paused until it eases.", 120)
+        elif risk.get("level") in ("normal", "elevated"):
+            self.alerts.resolve("news_risk")
         if now.weekday() < 5 and plan.get("as_of_bar"):
             age = (now.date() - date.fromisoformat(plan["as_of_bar"])).days
             if age > 4:
@@ -160,6 +173,8 @@ class Engine:
             try:
                 if time.monotonic() - self._last_market > (60 if in_session else 900):
                     self.refresh_market()
+                if time.monotonic() - self._last_board > (60 if in_session else 900):
+                    self.refresh_board()
                 if time.monotonic() - self._last_news > 120:
                     self.refresh_news()
                 if self._due_daily(now):
@@ -180,6 +195,7 @@ class Engine:
                 "plan": _read_json(live.PLAN), "options_account": options,
                 "etf_account": _read_json(daily.LEDGER), "market": self.market.snapshot(),
                 "daily_chart": _read_json(daily.CHART, []),
+                "board": self.board.snapshot(),
                 "news": {**news, "items": news["items"][:80] if include_items else []},
                 "alerts": alerts_list, "trial": trial.scorecard(options, alerts_list),
                 "backtest": backtest and {"period": backtest.get("period"),
@@ -188,6 +204,13 @@ class Engine:
                 "health": {**self.health, "assistant": assistant.configured(), "channels": alerts.channels(),
                            "news_updated": news.get("updated"), "news_errors": news.get("errors"),
                            "market_updated": self.market.updated}}
+
+
+def _short_name(name):
+    """'Infosys Ltd.' -> 'Infosys' for news searches."""
+    for suffix in (" Limited", " Ltd.", " Ltd", " Co."):
+        name = name.replace(suffix, "")
+    return name.strip()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -223,16 +246,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"token": engine.token, "mode": "paper"})
         if path == "/api/state":
             return self._send(200, engine.state())
-        if path == "/api/company-news":
-            name = self.path.split("name=", 1)[-1] if "name=" in self.path else ""
-            from urllib.parse import unquote_plus
-            name = unquote_plus(name)
-            if name not in {n for _, n, _ in COMPANIES}:
-                return self._send(404, {"error": "unknown company"})
+        if path in ("/api/company-news", "/api/stock"):
+            from urllib.parse import parse_qs, urlsplit
+            symbol = (parse_qs(urlsplit(self.path).query).get("symbol") or [""])[0].upper()
+            if symbol not in engine.board.info:
+                return self._send(404, {"error": "unknown symbol"})
             try:
-                return self._send(200, {"name": name, "items": engine.news.company(name)})
+                if path == "/api/stock":
+                    return self._send(200, engine.board.detail(symbol))
+                name = engine.board.info[symbol]["name"]
+                return self._send(200, {"symbol": symbol, "name": name, "items": engine.news.company(_short_name(name))})
             except Exception as exc:
-                return self._send(502, {"error": f"news source unavailable: {exc}"})
+                return self._send(502, {"error": f"data source unavailable: {exc}"})
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):

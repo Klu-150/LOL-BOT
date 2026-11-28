@@ -32,7 +32,7 @@ With a key it sends the terminal's data snapshot and your question to Anthropic'
 | Section | What it is for |
 |---|---|
 | Overview | What the bot is doing and why, account, open spread, Nifty today, alerts and market-moving news |
-| Markets | 12-month Nifty chart with EMA 50/200 and the regime the bot detected each day; 16 heavyweight stocks |
+| Markets | Live Nifty 50 and Sensex cards; all 50 Nifty and 30 Sensex companies as a heatmap or sortable list (updated every minute in market hours); click a company for its live 1-minute chart, 1-year chart, day and 52-week range, volume and news; 12-month Nifty chart with the regime the bot detected each day |
 | News | Live headlines from Google News, Economic Times, Livemint and Business Standard (every 2 min), sentiment/impact tags, company news, news-risk gauge |
 | Assistant | Ask about the market, the bot's decision, performance, news, issues or go-live readiness |
 | Performance | One-month trial scorecard (checks, pros, cons), equity curve, trades, 10-year research results |
@@ -77,3 +77,4 @@ stale data · missing NSE holiday calendar for a new year.
 | `paper/pro_engine_plan.json`, `paper/pro_engine_decisions.jsonl` | Latest plan and every decision |
 | `paper/pro_alerts.json` | Alert history |
 | `data/intraday_archive.csv` | Growing 5-minute archive for future intraday research |
+| `data/indices/nifty50.csv`, `data/indices/sensex30.csv` | Index members (NSE official list; Sensex reviewed 28 Nov 2026). Update when the indices rebalance (June and December) |

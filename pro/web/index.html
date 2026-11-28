@@ -90,20 +90,52 @@
 
     <!-- MARKETS -->
     <section class="page" id="page-markets" hidden>
+      <div class="index-cards" id="indexCards"></div>
       <div class="card">
-        <div class="card-head"><h3>Nifty 50 — last 12 months</h3>
+        <div class="card-head board-head">
+          <div class="segmented" id="indexTabs" role="tablist">
+            <button data-i="nifty50" class="on">Nifty 50</button><button data-i="sensex30">Sensex 30</button>
+          </div>
+          <div class="board-tools">
+            <input type="search" id="boardSearch" placeholder="Search company" aria-label="Search company">
+            <select id="boardSort" aria-label="Sort companies">
+              <option value="change">Biggest gainers</option><option value="-change">Biggest losers</option>
+              <option value="name">Name A–Z</option><option value="volume">Most traded</option>
+            </select>
+            <div class="segmented" id="viewTabs"><button data-v="heat" class="on">Heatmap</button><button data-v="list">List</button></div>
+          </div>
+        </div>
+        <p class="small muted board-note" id="boardNote"></p>
+        <div class="heatmap" id="heatmap"></div>
+        <div class="table-wrap" id="listWrap" hidden><table class="table board" id="boardTable">
+          <thead><tr><th>Company</th><th class="hide-sm">Today</th><th class="num">Price</th><th class="num">Change</th><th class="hide-sm">Day range</th></tr></thead>
+          <tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Nifty 50 index — last 12 months</h3>
           <div class="legend"><i class="l-price"></i>Close <i class="l-ema50"></i>EMA 50 <i class="l-ema200"></i>EMA 200</div></div>
         <div class="chart tall" id="dailyChart"></div>
         <div class="regime-strip" id="regimeStrip" aria-label="Market regime by day"></div>
         <div class="legend small" id="regimeLegend"></div>
       </div>
-      <div class="card">
-        <div class="card-head"><h3>Nifty heavyweights</h3><span class="muted" id="breadth"></span></div>
-        <div class="table-wrap"><table class="table" id="stocks">
-          <thead><tr><th>Company</th><th class="num">Price</th><th class="num">Change</th><th class="hide-sm">Day range</th><th></th></tr></thead>
-          <tbody></tbody></table></div>
-      </div>
     </section>
+
+    <!-- COMPANY DETAIL -->
+    <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+    <aside class="drawer" id="drawer" hidden aria-label="Company detail" role="dialog">
+      <div class="drawer-head">
+        <div><h2 id="dName">—</h2><span class="muted small" id="dMeta"></span></div>
+        <button class="icon-btn" id="drawerClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="drawer-price"><strong id="dPrice">—</strong><span id="dChange"></span><span class="live" id="dLive"></span></div>
+      <div class="segmented small-seg" id="rangeTabs"><button data-r="1d" class="on">Today</button><button data-r="1y">1 year</button></div>
+      <div class="chart" id="dChart"></div>
+      <div class="stat-row" id="dStats"></div>
+      <div class="range-block"><div class="small muted">52-week range</div><div class="range-bar wide"><i id="d52"></i></div>
+        <div class="pnl-labels"><span id="d52lo"></span><span id="d52hi"></span></div></div>
+      <h4>Latest news</h4>
+      <ul class="news compact" id="dNews"><li class="muted">Loading…</li></ul>
+    </aside>
 
     <!-- NEWS -->
     <section class="page" id="page-news" hidden>

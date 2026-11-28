@@ -233,3 +233,59 @@ select { width: 100%; margin: 10px 0; }
   .tabbar a.on { color: var(--accent); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---- Index board (Nifty 50 / Sensex 30) ---- */
+.index-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.index-card { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "top top" "price spark" "chg spark" "br br";
+  gap: 2px 16px; text-align: left; border: 1px solid var(--border); font: inherit; color: var(--text); }
+.index-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.index-card .ic-top { grid-area: top; display: flex; justify-content: space-between; font-weight: 650; color: var(--muted); }
+.index-card strong { grid-area: price; font-size: 26px; font-variant-numeric: tabular-nums; }
+.index-card > span:nth-of-type(1) { grid-area: chg; font-weight: 600; }
+.index-card .spark { grid-area: spark; width: 140px; height: 54px; align-self: center; }
+.index-card .ic-breadth { grid-area: br; display: flex; gap: 14px; margin-top: 8px; font-size: 13px; font-weight: 600; }
+.live { display: inline-flex; align-items: center; gap: 6px; color: var(--up); font-size: 12.5px; font-weight: 650; }
+.live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--up); animation: pulse 1.6s infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.board-head { align-items: center; }
+.board-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.board-tools select { width: auto; margin: 0; }
+.board-tools input[type=search] { min-width: 170px; }
+.board-note { margin: -4px 0 12px; }
+.heatmap { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.tile { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 10px 12px; border: 0; border-radius: 10px;
+  color: var(--text); text-align: left; transition: transform .12s; min-width: 0; }
+.tile:hover { transform: translateY(-2px); outline: 2px solid var(--accent); }
+.tile b { font-size: 13px; letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.tile span { font-size: 12.5px; font-variant-numeric: tabular-nums; opacity: .85; }
+.tile em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.spark { width: 110px; height: 30px; display: block; }
+.table.board tr.clickable { cursor: pointer; }
+.table.board tr.clickable:hover td { background: var(--surface-2); }
+.flash-up { animation: flashUp 1.4s; } .flash-down { animation: flashDown 1.4s; }
+@keyframes flashUp { 0% { box-shadow: 0 0 0 2px var(--up) inset; background-color: var(--up-soft); } }
+@keyframes flashDown { 0% { box-shadow: 0 0 0 2px var(--down) inset; background-color: var(--down-soft); } }
+
+/* ---- Company detail drawer ---- */
+body.no-scroll { overflow: hidden; }
+.drawer-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(8, 12, 20, .45); }
+.drawer { position: fixed; z-index: 21; top: 0; right: 0; bottom: 0; width: min(560px, 100vw); overflow-y: auto;
+  background: var(--surface); border-left: 1px solid var(--border); padding: 20px 22px 32px; box-shadow: -12px 0 32px rgba(0,0,0,.18); }
+.drawer-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.drawer-head h2 { font-size: 20px; }
+.drawer-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin: 14px 0 12px; }
+.drawer-price strong { font-size: 30px; font-variant-numeric: tabular-nums; border-radius: 6px; padding: 0 4px; margin-left: -4px; }
+.drawer-price > span:nth-child(2) { font-weight: 650; font-size: 16px; }
+.small-seg { display: inline-flex; margin-bottom: 8px; }
+.range-block { margin: 4px 0 8px; }
+.range-bar.wide { width: 100%; margin-top: 8px; }
+.drawer .stat-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  .index-cards { grid-template-columns: minmax(0, 1fr); }
+  .index-card .spark { width: 110px; }
+  .board-tools { width: 100%; }
+  .board-tools input[type=search] { flex: 1; min-width: 0; }
+  .heatmap { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .drawer { padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); }
+  .drawer .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

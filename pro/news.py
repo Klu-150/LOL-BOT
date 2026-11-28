@@ -107,13 +107,29 @@ def company_url(name):
     return f"https://news.google.com/rss/search?q={q}&hl=en-IN&gl=IN&ceid=IN:en"
 
 
+def _weight(item):
+    """Headline weight for the risk score: strong words count, mild ones do not; opinion/hypotheticals count half."""
+    if item["impact"] < 2:
+        return 0.0
+    w = item["impact"] * (1.5 if item["macro"] else 1.0)
+    title = item.get("title", "")
+    if title.rstrip().endswith("?") or re.match(r"(?i)^(if|why|what|how|should|can|will)\b", title) or \
+            re.search(r"(?i)\b(if|could|may|might|brace|warn\w*|says)\b", title):
+        w *= 0.5
+    return w
+
+
 def risk(items, hours=3, now=None):
-    """Market news risk 0-100 from recent high-impact negative headlines (macro weighted)."""
+    """Market news risk 0-100: balance of strong negative vs positive headlines in the last `hours`.
+
+    High (>= 60) needs a broad wave of strong negative news, e.g. eight or more crash/war/sell-off
+    headlines with few positives; a handful of opinion pieces stays normal.
+    """
     now = now or datetime.now(timezone.utc)
     recent = [i for i in items if datetime.fromisoformat(i["published"]) >= now - timedelta(hours=hours)]
-    neg = sum(i["impact"] * (1.5 if i["macro"] else 1) for i in recent if i["sentiment"] == "negative")
-    pos = sum(i["impact"] for i in recent if i["sentiment"] == "positive")
-    score = max(0.0, min(100.0, 4 * (neg - 0.5 * pos)))
+    neg = sum(_weight(i) for i in recent if i["sentiment"] == "negative")
+    pos = sum(_weight(i) for i in recent if i["sentiment"] == "positive")
+    score = max(0.0, min(100.0, 100 * (neg - 0.5 * pos) / (neg + pos + 25)))
     level = "high" if score >= 60 else "elevated" if score >= 35 else "normal"
     return {"score": round(score), "level": level, "window_hours": hours, "headlines": len(recent),
             "negative": sum(1 for i in recent if i["sentiment"] == "negative"),
