@@ -299,3 +299,58 @@ body.no-scroll { overflow: hidden; }
 .login-card input { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
 .signout { margin-top: auto; }
 .signout + .paper-note { margin-top: 0; }
+
+/* ---- Virtual trading ---- */
+.funds { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)) auto; gap: 12px; align-items: center; }
+.funds div span { display: block; font-size: 12px; color: var(--muted); }
+.funds div b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.trade-grid { display: grid; grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.6fr); gap: 18px; align-items: start; }
+.watch input[type=search] { width: 100%; margin-bottom: 8px; }
+.watchlist { list-style: none; margin: 0; padding: 0; max-height: 64vh; overflow-y: auto; }
+.watchlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 4px; border-top: 1px solid var(--border); }
+.watchlist li:first-child { border-top: 0; }
+.w-name { min-width: 0; } .w-name span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-px { text-align: right; font-variant-numeric: tabular-nums; } .w-px b, .w-px span { display: block; }
+.w-px b { border-radius: 4px; padding: 0 3px; }
+.w-act, .chain-act { display: flex; gap: 4px; }
+.bs { border: 0; width: 28px; height: 26px; border-radius: 7px; font-weight: 700; font-size: 12.5px; color: #fff; }
+.bs.buy { background: var(--up); } .bs.sell { background: var(--down); }
+.chain-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.chain-head select { width: auto; margin: 0; }
+.table.chain td { padding: 6px 8px; }
+.table.chain .center { text-align: center; } .table.chain .strike { font-weight: 700; }
+.table.chain tr.atm td { background: var(--accent-soft); }
+.table.chain td.num { white-space: nowrap; }
+.chain-px { font-variant-numeric: tabular-nums; font-weight: 600; }
+.chain-act { justify-content: flex-end; margin-top: 3px; } .chain .bs { width: 24px; height: 22px; font-size: 11px; }
+.book-table td { font-size: 13.5px; }
+.small-btn { padding: 4px 10px; font-size: 12.5px; }
+.status { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
+.s-complete { background: var(--up-soft); color: var(--up); } .s-rejected, .s-cancelled { background: var(--down-soft); color: var(--down); }
+.s-open, .s-amo, .s-trigger_pending { background: var(--warn-soft); color: var(--warn); }
+.ticket { position: fixed; z-index: 22; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 24px));
+  display: flex; flex-direction: column; gap: 12px; padding: 0 0 18px; overflow: hidden; }
+.ticket > *:not(.ticket-head) { margin: 0 18px; }
+.ticket-head { display: flex; justify-content: space-between; gap: 10px; padding: 14px 18px; background: var(--up-soft); }
+.ticket.selling .ticket-head { background: var(--down-soft); }
+.ticket-head h3 { font-size: 16px; }
+.side-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.side-toggle button { border: 1px solid var(--border); background: var(--surface); padding: 8px; border-radius: 10px; font-weight: 700; }
+.side-toggle button.on[data-s=BUY] { background: var(--up); color: #fff; border-color: var(--up); }
+.side-toggle button.on[data-s=SELL] { background: var(--down); color: #fff; border-color: var(--down); }
+.field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.field input { font: inherit; font-size: 15px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; width: 100%; }
+.field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.btn.big { padding: 12px; font-size: 15px; background: var(--up); }
+.ticket.selling .btn.big { background: var(--down); }
+@media (max-width: 1180px) { .funds { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 960px) { .trade-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .funds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .funds div b { font-size: 16px; }
+  .watchlist { max-height: none; }
+  #bookTabs button { padding: 5px 8px; }
+}
+.drawer-trade { display: flex; gap: 10px; margin: -4px 0 14px; }
+.drawer-trade .btn { flex: 1; text-align: center; color: #fff; }
+.buy-btn { background: var(--up); } .sell-btn { background: var(--down); }

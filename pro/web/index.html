@@ -18,6 +18,7 @@
     <nav class="nav" id="nav">
       <a href="#overview" data-page="overview"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg><span>Overview</span></a>
       <a href="#markets" data-page="markets"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg><span>Markets</span></a>
+      <a href="#trade" data-page="trade"><svg viewBox="0 0 24 24"><path d="M7 17V7M4 10l3-3 3 3M17 7v10M14 14l3 3 3-3"/></svg><span>Trade</span></a>
       <a href="#news" data-page="news"><svg viewBox="0 0 24 24"><path d="M4 5h13v14H6a2 2 0 01-2-2zM17 9h3v8a2 2 0 01-2 2M8 9h5M8 13h5"/></svg><span>News</span><b class="dot" id="newsDot" hidden></b></a>
       <a href="#assistant" data-page="assistant"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg><span>Assistant</span></a>
       <a href="#performance" data-page="performance"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Performance</span></a>
@@ -129,6 +130,7 @@
         <button class="icon-btn" id="drawerClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="drawer-price"><strong id="dPrice">—</strong><span id="dChange"></span><span class="live" id="dLive"></span></div>
+      <div class="drawer-trade" id="dTrade"></div>
       <div class="segmented small-seg" id="rangeTabs"><button data-r="1d" class="on">Today</button><button data-r="1y">1 year</button></div>
       <div class="chart" id="dChart"></div>
       <div class="stat-row" id="dStats"></div>
@@ -137,6 +139,62 @@
       <h4>Latest news</h4>
       <ul class="news compact" id="dNews"><li class="muted">Loading…</li></ul>
     </aside>
+
+    <!-- TRADE -->
+    <section class="page" id="page-trade" hidden>
+      <div class="funds card" id="funds"></div>
+      <div class="trade-grid">
+        <div class="card watch">
+          <div class="card-head">
+            <div class="segmented" id="watchTabs"><button data-w="stocks" class="on">Stocks</button><button data-w="chain">Nifty options</button></div>
+          </div>
+          <div id="watchStocks">
+            <input type="search" id="watchSearch" placeholder="Search Nifty 50 / Sensex stocks" aria-label="Search stocks">
+            <ul class="watchlist" id="watchList"></ul>
+          </div>
+          <div id="watchChain" hidden>
+            <div class="chain-head"><select id="chainExpiry" aria-label="Expiry"></select><span class="small muted" id="chainSpot"></span></div>
+            <p class="small muted">Option prices are model prices from live Nifty and India VIX (no live option quotes).</p>
+            <div class="table-wrap"><table class="table chain" id="chainTable">
+              <thead><tr><th class="num">Call LTP</th><th class="num">Δ</th><th class="center">Strike</th><th class="num">Δ</th><th class="num">Put LTP</th></tr></thead>
+              <tbody></tbody></table></div>
+          </div>
+        </div>
+        <div class="card book">
+          <div class="card-head">
+            <div class="segmented" id="bookTabs">
+              <button data-b="positions" class="on">Positions</button><button data-b="holdings">Holdings</button>
+              <button data-b="orders">Orders</button><button data-b="trades">Trades</button>
+            </div>
+            <span class="chip" id="mktChip">—</span>
+          </div>
+          <div class="table-wrap"><table class="table book-table" id="bookTable"><thead></thead><tbody></tbody></table></div>
+          <p class="small muted" id="bookNote"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ORDER TICKET -->
+    <div class="drawer-backdrop" id="ticketBackdrop" hidden></div>
+    <form class="ticket card" id="ticket" hidden role="dialog" aria-label="Order ticket">
+      <div class="ticket-head" id="ticketHead">
+        <div><h3 id="tName">—</h3><span class="small" id="tQuote"></span></div>
+        <button type="button" class="icon-btn" id="ticketClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="side-toggle" id="tSide"><button type="button" data-s="BUY" class="on">Buy</button><button type="button" data-s="SELL">Sell</button></div>
+      <label class="field"><span>Product</span><div class="segmented" id="tProduct"></div></label>
+      <label class="field"><span>Order type</span><div class="segmented" id="tType">
+        <button type="button" data-t="MARKET" class="on">Market</button><button type="button" data-t="LIMIT">Limit</button>
+        <button type="button" data-t="SL">SL</button><button type="button" data-t="SL-M">SL-M</button></div></label>
+      <div class="field-row">
+        <label class="field"><span id="tQtyLabel">Quantity</span><input type="number" id="tQty" min="1" step="1" value="1" inputmode="numeric"></label>
+        <label class="field" id="tPriceWrap" hidden><span>Limit price</span><input type="number" id="tPrice" step="0.05" min="0.05" inputmode="decimal"></label>
+        <label class="field" id="tTrigWrap" hidden><span>Trigger price</span><input type="number" id="tTrig" step="0.05" min="0.05" inputmode="decimal"></label>
+      </div>
+      <p class="small muted" id="tEstimate"></p>
+      <button class="btn big" type="submit" id="tSubmit">Buy</button>
+      <p class="small" id="tMsg" role="status"></p>
+    </form>
 
     <!-- NEWS -->
     <section class="page" id="page-news" hidden>
@@ -271,6 +329,7 @@
 <nav class="tabbar" id="tabbar" aria-label="Sections">
   <a href="#overview" data-page="overview"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg>Home</a>
   <a href="#markets" data-page="markets"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>Markets</a>
+  <a href="#trade" data-page="trade"><svg viewBox="0 0 24 24"><path d="M7 17V7M4 10l3-3 3 3M17 7v10M14 14l3 3 3-3"/></svg>Trade</a>
   <a href="#news" data-page="news"><svg viewBox="0 0 24 24"><path d="M4 5h13v14H6a2 2 0 01-2-2zM17 9h3v8a2 2 0 01-2 2"/></svg>News</a>
   <a href="#assistant" data-page="assistant"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Ask</a>
   <a href="#performance" data-page="performance"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7"/></svg>Results</a>

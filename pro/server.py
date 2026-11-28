@@ -21,7 +21,7 @@ import traceback
 
 from data import ROOT
 from exchange_calendar import HOLIDAYS, REVIEWED_YEARS
-from pro import alerts, assistant, daily, live, options_paper, trial
+from pro import alerts, assistant, broker, daily, live, options_paper, trial
 from pro.constituents import IndexBoard
 from pro.market import MarketDesk, ZONE
 from pro.news import NewsDesk
@@ -47,6 +47,8 @@ class Engine:
         self.market, self.news, self.alerts = MarketDesk(), NewsDesk(), alerts.AlertCenter(notify=notify)
         self.board = IndexBoard()
         self._last_board = 0.0
+        self.broker = broker.Broker(ROOT / "paper" / "pro_broker.json",
+                                    broker.Quotes(self._stock_quote, self._index_quote))
         self.token = secrets.token_urlsafe(24)
         self.health = {"started": datetime.now(ZONE).isoformat(), "daily": {}, "market_failures": 0, "loops": {}}
         self._job_lock, self._stop = threading.Lock(), threading.Event()
@@ -164,6 +166,19 @@ class Engine:
             self.alerts.raise_alert("assistant_key", "info", "AI assistant in basic mode",
                                     "Set ANTHROPIC_API_KEY (or run `ant auth login`) to enable the Claude-powered assistant.", 7 * 24 * 60)
 
+    def _stock_quote(self, symbol):
+        return self.board.quotes.get(symbol)
+
+    def _index_quote(self):
+        mkt = self.market.snapshot()
+        n, v = mkt.get("nifty") or {}, mkt.get("vix") or {}
+        if not n.get("price") or not v.get("price"):
+            return None
+        today = datetime.now(ZONE).date().isoformat()
+        when = datetime.fromisoformat(self.market.updated) if n.get("as_of") == today and self.market.updated else \
+            datetime.fromisoformat(f"{n['as_of']}T15:30:00+05:30")
+        return {"spot": float(n["price"]), "vix": float(v["price"]), "time": when}
+
     def _due_open_fill(self, now):
         stamp = now.strftime("%H:%M")
         trading = now.weekday() < 5 and now.date().isoformat() not in HOLIDAYS
@@ -233,6 +248,10 @@ class Engine:
                     self.refresh_board()
                 if time.monotonic() - self._last_news > 120:
                     self.refresh_news()
+                try:
+                    self.broker.process(now)
+                except Exception:
+                    log.error("virtual broker processing failed: %s", traceback.format_exc())
                 if self._due_open_fill(now):
                     self.fill_at_open(now)
                 if self._due_daily(now):
@@ -379,6 +398,21 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"token": engine.token, "mode": "paper"})
         if path == "/api/state":
             return self._send(200, engine.state())
+        if path.startswith("/api/broker"):
+            from urllib.parse import parse_qs, urlsplit
+            qs = parse_qs(urlsplit(self.path).query)
+            try:
+                if path == "/api/broker":
+                    return self._send(200, engine.broker.snapshot())
+                if path == "/api/broker/chain":
+                    return self._send(200, engine.broker.chain((qs.get("expiry") or [None])[0]))
+                if path == "/api/broker/quote":
+                    inst = (qs.get("instrument") or [""])[0]
+                    q = engine.broker.quotes.get(inst)
+                    return self._send(200 if q else 404, {"instrument": inst, "name": broker.label(inst), **(q or {})})
+            except ValueError as exc:
+                return self._send(400, {"error": str(exc)})
+            return self._send(404, {"error": "not found"})
         if path in ("/api/company-news", "/api/stock"):
             from urllib.parse import parse_qs, urlsplit
             symbol = (parse_qs(urlsplit(self.path).query).get("symbol") or [""])[0].upper()
@@ -424,6 +458,25 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "empty question"})
             history = body.get("history") if isinstance(body.get("history"), list) else []
             return self._send(200, assistant.ask(question, history, engine.state()))
+        if self.path.startswith("/api/broker/"):
+            try:
+                if self.path == "/api/broker/order":
+                    if isinstance(body.get("instrument"), str) and body["instrument"].startswith("EQ:") \
+                            and body["instrument"][3:] not in engine.board.info:
+                        raise ValueError("Only Nifty 50 / Sensex stocks can be traded")
+                    order = engine.broker.place(body.get("instrument", ""), body.get("side"), body.get("product"),
+                                                body.get("type", "MARKET"), body.get("qty", 0), body.get("price"), body.get("trigger"))
+                    return self._send(200, {"order": order, "account": engine.broker.snapshot()})
+                if self.path == "/api/broker/cancel":
+                    order = engine.broker.cancel(str(body.get("id", "")))
+                    return self._send(200, {"order": order, "account": engine.broker.snapshot()})
+                if self.path == "/api/broker/reset":
+                    if body.get("confirm") != "RESET":
+                        raise ValueError("Type RESET to confirm")
+                    return self._send(200, {"account": engine.broker.reset(body.get("capital", broker.DEFAULT_CAPITAL))})
+            except (ValueError, TypeError) as exc:
+                return self._send(400, {"error": str(exc)})
+            return self._send(404, {"error": "not found"})
         if self.path == "/api/run-daily":
             now = datetime.now(ZONE)
             return self._send(200, engine.run_daily(now.weekday() < 5 and now.strftime("%H:%M") >= DAILY_RUN_TIME))

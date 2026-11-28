@@ -3,8 +3,9 @@
 
 const $ = (id) => document.getElementById(id);
 const S = { state: null, token: null, page: "overview", newsFilter: "all", chat: [], busy: false,
-  index: "nifty50", view: "heat", stock: null, stockData: null, range: "1d" };
-const TITLES = { overview: "Overview", markets: "Markets", news: "Live news", assistant: "Assistant",
+  index: "nifty50", view: "heat", stock: null, stockData: null, range: "1d",
+  acct: null, watch: "stocks", book: "positions", chain: null, chainExpiry: null, ticket: null };
+const TITLES = { overview: "Overview", markets: "Markets", trade: "Trade (virtual money)", news: "Live news", assistant: "Assistant",
   performance: "Performance", alerts: "Alerts & health", strategy: "How it works" };
 const REGIME_LABEL = { uptrend: "Uptrend", transition: "Transition", range: "Range", downtrend: "Downtrend", stress: "Stress", warmup: "Warm-up" };
 
@@ -121,6 +122,7 @@ function render() {
   $("alertCount").hidden = !unread; $("alertCount").textContent = unread;
   $("newsDot").hidden = st.news?.risk?.level !== "high";
   renderOverview(st); renderMarkets(st); renderNews(st); renderPerformance(st); renderAlerts(st);
+  if (S.page === "trade") renderWatch();
   $("aiMode").textContent = st.health?.assistant ? "Powered by Claude · uses the terminal's live data" : "Basic mode · set ANTHROPIC_API_KEY for the full AI assistant";
 }
 
@@ -315,6 +317,8 @@ function renderStock() {
   $("dChange").textContent = `${d.change > 0 ? "+" : ""}${num(d.change)} (${pct(d.change_pct)})`; $("dChange").className = sign(d.change_pct);
   $("dLive").textContent = open ? "Live · refreshes every 15 s" : `Market closed · last trade ${d.time ? new Date(d.time).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : ""}`;
   $("dLive").className = open ? "live" : "muted small";
+  fill($("dTrade"), el("a", { class: "btn buy-btn", href: "#trade/BUY/EQ:" + d.symbol, text: "Buy" }),
+    el("a", { class: "btn sell-btn", href: "#trade/SELL/EQ:" + d.symbol, text: "Sell" }));
   const color = (d.change_pct || 0) >= 0 ? cssVar("--up") : cssVar("--down");
   if (S.range === "1y") {
     lineChart($("dChart"), [{ values: d.daily.map((x) => x.c), color: cssVar("--c-price"), area: true }], { labels: d.daily.map((x) => x.d), label: d.name + " one year" });
@@ -422,6 +426,174 @@ function renderAlerts(st) {
   fill($("channels"), row("In the terminal", "on"), row("Mac notifications", c.desktop ? "on" : "off"), row("Telegram", c.telegram ? "on" : "not set up"));
 }
 
+// ------------------------------------------------------------- virtual broker
+const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+async function loadBroker() {
+  try {
+    const r = await fetch("api/broker", { cache: "no-store" });
+    if (r.status === 401) { showLogin(true); return; }
+    if (!r.ok) throw new Error((await r.json()).error);
+    S.acct = await r.json(); renderTrade();
+  } catch (e) { $("bookNote").textContent = "Could not load account: " + e.message; }
+}
+async function loadChain() {
+  try {
+    const r = await fetch("api/broker/chain" + (S.chainExpiry ? "?expiry=" + S.chainExpiry : ""), { cache: "no-store" });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    S.chain = d; S.chainExpiry = d.expiry; renderChain();
+  } catch (e) { fill($("chainTable").tBodies[0], el("tr", {}, el("td", { colspan: 5, class: "muted", text: e.message }))); }
+}
+function renderTrade() {
+  const a = S.acct; if (!a) return;
+  const f = a.funds;
+  const tile = (k, v, cls) => el("div", {}, el("span", { text: k }), el("b", { class: cls || "", text: v }));
+  fill($("funds"),
+    tile("Account value", inr(f.account_value)), tile("Available to trade", inr(f.available)),
+    tile("Margin used", inr(f.margin_used)), tile("Unrealised P&L", inr(f.unrealised), sign(f.unrealised)),
+    tile("Total P&L", inr(f.total_pnl), sign(f.total_pnl)), tile("Charges paid", inr(f.charges)),
+    el("button", { class: "btn ghost", type: "button", text: "Reset funds", onclick: resetAccount }));
+  $("mktChip").textContent = a.session_open ? "Market open · orders fill live" : "Market closed · orders queue for the open";
+  $("mktChip").className = "chip " + (a.session_open ? "up" : "");
+  renderWatch(); renderBook();
+}
+function renderWatch() {
+  const q = $("watchSearch").value.trim().toLowerCase();
+  const stocks = (S.state?.board?.stocks || []).filter((x) => !q || x.name.toLowerCase().includes(q) || x.symbol.toLowerCase().includes(q));
+  fill($("watchList"), stocks.length ? stocks.map((x) => el("li", {},
+    el("div", { class: "w-name" }, el("b", { text: x.symbol }), el("span", { class: "small muted", text: x.name })),
+    el("div", { class: "w-px" }, el("b", { class: flashClass("w:" + x.symbol, x.price).trim(), text: num(x.price) }), el("span", { class: "small " + sign(x.change_pct), text: pct(x.change_pct) })),
+    el("div", { class: "w-act" }, el("button", { type: "button", class: "bs buy", text: "B", title: "Buy " + x.symbol, onclick: () => openTicket("EQ:" + x.symbol, "BUY") }),
+      el("button", { type: "button", class: "bs sell", text: "S", title: "Sell " + x.symbol, onclick: () => openTicket("EQ:" + x.symbol, "SELL") })))) :
+    el("li", { class: "muted", text: S.state?.board?.stocks ? "No match" : "Loading prices…" }));
+}
+function renderChain() {
+  const c = S.chain; if (!c) return;
+  const sel = $("chainExpiry");
+  if (sel.options.length !== c.expiries.length) fill(sel, c.expiries.map((e) => el("option", { value: e, text: new Date(e + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) })));
+  sel.value = c.expiry;
+  $("chainSpot").textContent = `Nifty ${num(c.spot)} · VIX ${num(c.vix)} · lot ${c.lot_size}`;
+  const cell = (leg, side) => leg ? el("td", { class: "num" }, el("div", { class: "chain-px", text: num(leg.ltp) }),
+    el("div", { class: "chain-act" }, el("button", { type: "button", class: "bs buy", text: "B", onclick: () => openTicket(leg.instrument, "BUY") }),
+      el("button", { type: "button", class: "bs sell", text: "S", onclick: () => openTicket(leg.instrument, "SELL") }))) : el("td", { text: "—" });
+  fill($("chainTable").tBodies[0], c.rows.map((r) => el("tr", { class: r.strike === c.atm ? "atm" : (r.strike < c.atm ? "itm-ce" : "itm-pe") },
+    cell(r.CE), el("td", { class: "num small muted", text: r.CE ? r.CE.delta.toFixed(2) : "" }),
+    el("td", { class: "center strike", text: r.strike }),
+    el("td", { class: "num small muted", text: r.PE ? r.PE.delta.toFixed(2) : "" }), cell(r.PE))));
+}
+const BOOK_HEAD = {
+  positions: ["Instrument", "Product", "Qty", "Avg", "LTP", "P&L", ""],
+  holdings: ["Stock", "Qty", "Avg cost", "LTP", "Value", "P&L", ""],
+  orders: ["Time", "Instrument", "Side", "Type", "Qty", "Price", "Status", ""],
+  trades: ["Time", "Instrument", "Side", "Product", "Qty", "Price", "Charges"],
+};
+function renderBook() {
+  const a = S.acct; if (!a) return;
+  const t = $("bookTable"), kind = S.book;
+  fill(t.tHead, el("tr", {}, BOOK_HEAD[kind].map((h, i) => el("th", { class: i > 1 && kind !== "orders" ? "num" : "", text: h }))));
+  const exitBtn = (p) => p.qty ? el("button", { type: "button", class: "btn ghost small-btn", text: "Exit", onclick: () => exitPosition(p) }) : el("span", { class: "small muted", text: "closed" });
+  let rows = [];
+  if (kind === "positions") rows = a.positions.map((p) => el("tr", {}, el("td", {}, el("b", { text: p.name }), p.model ? el("div", { class: "small muted", text: "model price" }) : null),
+    el("td", { text: p.product }), el("td", { class: "num " + sign(p.qty), text: p.qty }), el("td", { class: "num", text: num(p.avg) }),
+    el("td", { class: "num", text: num(p.ltp) }), el("td", { class: "num " + sign(p.pnl), text: inr(p.pnl, 2) }), el("td", { class: "num" }, exitBtn(p))));
+  if (kind === "holdings") rows = a.holdings.map((p) => el("tr", {}, el("td", {}, el("b", { text: p.name })), el("td", { class: "num", text: p.qty }),
+    el("td", { class: "num", text: num(p.avg) }), el("td", { class: "num", text: num(p.ltp) }), el("td", { class: "num", text: inr(p.value) }),
+    el("td", { class: "num " + sign(p.pnl), text: inr(p.pnl, 2) }), el("td", { class: "num" }, exitBtn(p))));
+  if (kind === "orders") rows = a.orders.map((o) => el("tr", {}, el("td", { class: "small", text: new Date(o.time).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) }),
+    el("td", {}, el("b", { text: o.name }), el("div", { class: "small muted", text: o.product + (o.tag ? " · " + o.tag.replaceAll("_", " ") : "") })),
+    el("td", { class: o.side === "BUY" ? "up" : "down", text: o.side }), el("td", { text: o.type }), el("td", { class: "num", text: o.qty }),
+    el("td", { class: "num", text: o.fill_price != null ? num(o.fill_price) : o.price ? num(o.price) : o.trigger ? "trg " + num(o.trigger) : "MKT" }),
+    el("td", {}, el("span", { class: "status s-" + o.status.toLowerCase(), text: o.status.replace("_", " ") }), o.message ? el("div", { class: "small muted", text: o.message }) : null),
+    el("td", {}, ["OPEN", "AMO", "TRIGGER_PENDING"].includes(o.status) ? el("button", { type: "button", class: "btn ghost small-btn", text: "Cancel", onclick: () => cancelOrder(o.id) }) : null)));
+  if (kind === "trades") rows = a.trades.map((x) => el("tr", {}, el("td", { class: "small", text: new Date(x.time).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) }),
+    el("td", {}, el("b", { text: x.name })), el("td", { class: x.side === "BUY" ? "up" : "down", text: x.side }), el("td", { class: "num", text: x.product }),
+    el("td", { class: "num", text: x.qty }), el("td", { class: "num", text: num(x.price) }), el("td", { class: "num", text: inr(x.charges, 2) })));
+  const empty = { positions: "No open positions. Pick a stock or option on the left and tap B (buy) or S (sell).",
+    holdings: "No delivery (CNC) holdings yet.", orders: "No orders yet.", trades: "No trades yet." }[kind];
+  fill(t.tBodies[0], rows.length ? rows : el("tr", {}, el("td", { colspan: BOOK_HEAD[kind].length, class: "muted", text: empty })));
+  $("bookNote").textContent = "Virtual money only: nothing is sent to an exchange or broker. Stock prices are public quotes (about 1 minute); option prices are model prices. Charges are estimates.";
+}
+async function exitPosition(p) {
+  if (!confirm(`Exit ${p.name}: ${p.qty > 0 ? "sell" : "buy"} ${Math.abs(p.qty)} at market?`)) return;
+  try { await post("api/broker/order", { instrument: p.instrument, side: p.qty > 0 ? "SELL" : "BUY", product: p.product, type: "MARKET", qty: Math.abs(p.qty) }); }
+  catch (e) { alert(e.message); }
+  loadBroker();
+}
+async function cancelOrder(id) { try { await post("api/broker/cancel", { id }); } catch (e) { alert(e.message); } loadBroker(); }
+async function resetAccount() {
+  const cap = prompt("Reset the virtual trading account. All positions and orders will be cleared.\nStarting capital in ₹:", "500000");
+  if (!cap) return;
+  if (prompt('Type RESET to confirm') !== "RESET") return;
+  try { await post("api/broker/reset", { capital: Number(cap), confirm: "RESET" }); } catch (e) { alert(e.message); }
+  loadBroker();
+}
+
+// order ticket
+let ticketTimer = null;
+function openTicket(instrument, side) {
+  const opt = instrument.startsWith("OPT:");
+  S.ticket = { instrument, side, opt, product: opt ? "NRML" : "CNC", type: "MARKET", quote: null };
+  fill($("tProduct"), (opt ? [["NRML", "Overnight (NRML)"], ["MIS", "Intraday (MIS)"]] : [["CNC", "Delivery (CNC)"], ["MIS", "Intraday (MIS)"]])
+    .map(([v, t], i) => el("button", { type: "button", "data-p": v, class: i ? "" : "on", text: t })));
+  $("tQtyLabel").textContent = opt ? `Lots (1 lot = ${S.acct?.lot_size || 65})` : "Quantity (shares)";
+  $("tQty").value = 1; $("tPrice").value = ""; $("tTrig").value = ""; $("tMsg").textContent = "";
+  document.querySelectorAll("#tType button").forEach((b) => b.classList.toggle("on", b.dataset.t === "MARKET"));
+  setSide(side); setType("MARKET");
+  $("ticket").hidden = false; $("ticketBackdrop").hidden = false;
+  refreshTicketQuote(); clearInterval(ticketTimer); ticketTimer = setInterval(refreshTicketQuote, 4000);
+  $("tQty").focus();
+}
+function closeTicket() { clearInterval(ticketTimer); S.ticket = null; $("ticket").hidden = true; $("ticketBackdrop").hidden = true; }
+function setSide(side) {
+  S.ticket.side = side;
+  document.querySelectorAll("#tSide button").forEach((b) => b.classList.toggle("on", b.dataset.s === side));
+  $("ticket").classList.toggle("selling", side === "SELL");
+  $("tSubmit").textContent = side === "BUY" ? "Buy" : "Sell";
+  estimate();
+}
+function setType(type) {
+  S.ticket.type = type;
+  $("tPriceWrap").hidden = !["LIMIT", "SL"].includes(type); $("tTrigWrap").hidden = !["SL", "SL-M"].includes(type);
+  estimate();
+}
+async function refreshTicketQuote() {
+  const t = S.ticket; if (!t) return;
+  try {
+    const r = await fetch("api/broker/quote?instrument=" + encodeURIComponent(t.instrument), { cache: "no-store" });
+    const q = await r.json(); if (!r.ok) throw new Error(q.error || "no price");
+    if (S.ticket !== t) return;
+    t.quote = q;
+    $("tName").textContent = q.name;
+    $("tQuote").textContent = `LTP ${num(q.ltp)} · Bid ${num(q.bid)} · Ask ${num(q.ask)}${q.model ? " · model price" : ""}`;
+    if (!$("tPrice").value) $("tPrice").value = q.ltp;
+    estimate();
+  } catch (e) { $("tQuote").textContent = "Price unavailable: " + e.message; }
+}
+function ticketQty() { const n = Math.max(1, Math.floor(Number($("tQty").value) || 0)); return S.ticket.opt ? n * (S.acct?.lot_size || 65) : n; }
+function estimate() {
+  const t = S.ticket; if (!t || !t.quote) return;
+  const px = t.type === "MARKET" || t.type === "SL-M" ? (t.side === "BUY" ? t.quote.ask : t.quote.bid) : Number($("tPrice").value) || t.quote.ltp;
+  const qty = ticketQty(), value = px * qty;
+  const avail = S.acct?.funds?.available;
+  $("tEstimate").textContent = `${qty} × ${num(px)} ≈ ${inr(value)}` + (t.side === "SELL" && t.opt ? " premium received; margin is blocked for short options" : "") +
+    (avail != null ? ` · available ${inr(avail)}` : "");
+}
+async function submitTicket(e) {
+  e.preventDefault();
+  const t = S.ticket; if (!t) return;
+  $("tSubmit").disabled = true; $("tMsg").textContent = "Placing order…"; $("tMsg").className = "small";
+  try {
+    const r = await post("api/broker/order", { instrument: t.instrument, side: t.side, product: t.product, type: t.type, qty: ticketQty(),
+      price: ["LIMIT", "SL"].includes(t.type) ? Number($("tPrice").value) : null, trigger: ["SL", "SL-M"].includes(t.type) ? Number($("tTrig").value) : null });
+    const o = r.order; S.acct = r.account; renderTrade();
+    const ok = o.status !== "REJECTED";
+    $("tMsg").textContent = { COMPLETE: `Executed at ${num(o.fill_price)} · charges ${inr(o.charges, 2)}`, OPEN: "Order placed: waiting for your price",
+      AMO: "Market closed: order queued for the next open", TRIGGER_PENDING: "Stop order placed: waiting for the trigger", REJECTED: "Rejected: " + o.message }[o.status] || o.status;
+    $("tMsg").className = "small " + (ok ? "up" : "down");
+    if (ok) { S.book = o.status === "COMPLETE" ? "positions" : "orders"; document.querySelectorAll("#bookTabs button").forEach((b) => b.classList.toggle("on", b.dataset.b === S.book)); renderBook(); }
+  } catch (err) { $("tMsg").textContent = err.message; $("tMsg").className = "small down"; }
+  $("tSubmit").disabled = false;
+}
+
 // --------------------------------------------------------------- assistant
 // Minimal safe formatting for assistant text: **bold**, "- " bullets, paragraphs. Built with DOM nodes only.
 function richText(text) {
@@ -468,7 +640,7 @@ async function ask(text) {
 
 // ---------------------------------------------------------------- routing
 function route() {
-  const [page, sub] = (location.hash || "#overview").slice(1).split("/");
+  const [page, sub, sub2] = (location.hash || "#overview").slice(1).split("/");
   S.page = TITLES[page] ? page : "overview";
   if (S.page === "markets" && sub && sub !== S.stock) setTimeout(() => openStock(sub.toUpperCase()), 0);
   if (S.page !== "markets" && S.stock) closeStock();
@@ -477,7 +649,14 @@ function route() {
   $("pageTitle").textContent = TITLES[S.page];
   if (S.page === "alerts" && S.state?.alerts?.some((a) => !a.read)) post("api/alerts/read").then(load).catch(() => {});
   render();
-  if (!sub) window.scrollTo(0, 0);
+  if (S.page === "trade") {
+    loadBroker(); if (S.watch === "chain") loadChain();
+    if ((sub === "BUY" || sub === "SELL") && sub2) {
+      history.replaceState(null, "", "#trade");
+      setTimeout(() => openTicket(decodeURIComponent(sub2), sub), 0);
+    }
+  }
+  if (!sub || S.page === "trade") window.scrollTo(0, 0);
 }
 
 function init() {
@@ -534,6 +713,27 @@ function init() {
   });
   fetch("api/auth").then((r) => r.json()).then((a) => { $("signOut").hidden = !a.login_required; }).catch(() => {});
   $("signOut").onclick = async () => { await fetch("api/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); S.state = null; showLogin(true); };
+  $("watchTabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return; S.watch = b.dataset.w;
+    document.querySelectorAll("#watchTabs button").forEach((x) => x.classList.toggle("on", x === b));
+    $("watchStocks").hidden = S.watch !== "stocks"; $("watchChain").hidden = S.watch !== "chain";
+    if (S.watch === "chain") loadChain();
+  });
+  $("watchSearch").addEventListener("input", renderWatch);
+  $("chainExpiry").addEventListener("change", (e) => { S.chainExpiry = e.target.value; loadChain(); });
+  $("bookTabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return; S.book = b.dataset.b;
+    document.querySelectorAll("#bookTabs button").forEach((x) => x.classList.toggle("on", x === b)); renderBook();
+  });
+  $("tSide").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setSide(b.dataset.s); });
+  $("tType").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { document.querySelectorAll("#tType button").forEach((x) => x.classList.toggle("on", x === b)); setType(b.dataset.t); } });
+  $("tProduct").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { S.ticket.product = b.dataset.p; document.querySelectorAll("#tProduct button").forEach((x) => x.classList.toggle("on", x === b)); } });
+  ["tQty", "tPrice"].forEach((id) => $(id).addEventListener("input", estimate));
+  $("ticket").addEventListener("submit", submitTicket);
+  $("ticketClose").onclick = closeTicket; $("ticketBackdrop").onclick = closeTicket;
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.ticket) closeTicket(); });
+  setInterval(() => { if (S.page === "trade" && !document.hidden) loadBroker(); }, 5000);
+  setInterval(() => { if (S.page === "trade" && S.watch === "chain" && !document.hidden) loadChain(); }, 15000);
   window.addEventListener("hashchange", route);
   let resize; window.addEventListener("resize", () => { clearTimeout(resize); resize = setTimeout(render, 150); });
   chatRender(); route(); load();
