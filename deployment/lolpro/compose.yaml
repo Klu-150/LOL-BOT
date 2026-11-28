@@ -1,0 +1,47 @@
+# LOL Pro paper terminal: an independent compose project in /srv/lolpro.
+# It never touches the League engine, its accounts or its pinned policy: separate image tag,
+# separate container and its own state folder (./state). Private only: bound to the VM's
+# loopback and shared on the Tailscale network by `tailscale serve --bg --http=8787 ...`.
+name: lolpro
+services:
+  lolpro:
+    image: league-lolpro:current
+    restart: unless-stopped
+    user: "10001:10001"
+    working_dir: /app
+    entrypoint: ["sh", "-c"]
+    command:
+      - python -c "from cloud_bootstrap import seed_storage; seed_storage('/state')" && mkdir -p /state/paper/tmp && exec python -m pro.server --host 0.0.0.0 --port 8787 --no-notify
+    env_file:
+      - path: ./lolpro.env   # optional: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+        required: false
+    environment:
+      LOLPRO_ALLOWED_HOSTS: "league-engine,league-engine.taila6936a.ts.net,100.68.162.75"
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      TMPDIR: /state/paper/tmp
+      TZ: Asia/Kolkata
+    mem_limit: 384m
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 96
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - ./state:/state
+    ports:
+      - "127.0.0.1:8787:8787"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/api/session',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

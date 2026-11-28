@@ -61,7 +61,10 @@ def ask(question, history, state):
     """Return {"answer", "source"}. history: [{"role": "user"|"assistant", "content": str}, ...]."""
     if not configured():
         return {"answer": fallback(question, state), "source": "built-in (add ANTHROPIC_API_KEY for the AI assistant)"}
-    import anthropic
+    try:
+        import anthropic
+    except ImportError:
+        return {"answer": fallback(question, state), "source": "built-in (anthropic package not installed on this server)"}
 
     client = anthropic.Anthropic()
     turns = [m for m in history[-12:] if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)]

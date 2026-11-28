@@ -185,3 +185,34 @@ def test_board_snapshot_counts_breadth(monkeypatch):
     assert snap["indices"]["sensex30"]["members"] == 30
     with pytest.raises(KeyError):
         board.detail("NOT-A-STOCK")
+
+
+def test_server_host_and_origin_allowlist(tmp_path, monkeypatch):
+    from http.server import ThreadingHTTPServer
+    import http.client
+    from pro import server
+    monkeypatch.setattr(server, "ALLOWED_HOSTS", {"127.0.0.1", "localhost", "league-engine.example.ts.net"})
+    engine = server.Engine(notify=False)
+    engine.alerts = alerts.AlertCenter(store=tmp_path / "a.json", notify=False)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    httpd.engine = engine
+    port = httpd.server_address[1]
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+
+    def call(method, path, headers):
+        c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        c.request(method, path, body=b"{}" if method == "POST" else None, headers=headers)
+        r = c.getresponse()
+        body = r.read()
+        c.close()
+        return r.status, body
+    try:
+        assert call("GET", "/api/session", {"Host": "league-engine.example.ts.net:8787"})[0] == 200
+        assert call("GET", "/api/session", {"Host": "evil.example"})[0] == 403  # DNS-rebinding guard
+        token = json.loads(call("GET", "/api/session", {"Host": "127.0.0.1"})[1])["token"]
+        ok = {"Host": "league-engine.example.ts.net:8787", "Origin": "http://league-engine.example.ts.net:8787", "X-Session-Token": token}
+        assert call("POST", "/api/alerts/read", ok)[0] == 200
+        assert call("POST", "/api/alerts/read", {**ok, "Origin": "https://evil.example"})[0] == 403
+        assert call("POST", "/api/alerts/read", {**ok, "X-Session-Token": "nope"})[0] == 403
+    finally:
+        httpd.shutdown()

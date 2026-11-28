@@ -7,6 +7,7 @@ that raises alerts (in-app, macOS notification, optional Telegram).
 """
 import argparse
 from datetime import date, datetime
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import logging
@@ -27,6 +28,8 @@ WEB = Path(__file__).resolve().parent / "web"
 STATIC = {"/": ("index.html", "text/html; charset=utf-8"), "/app.js": ("app.js", "text/javascript; charset=utf-8"),
           "/styles.css": ("styles.css", "text/css; charset=utf-8"), "/icon.svg": ("icon.svg", "image/svg+xml")}
 DAILY_RUN_TIME = "15:20"
+# Hosts the terminal answers to. Add private names (e.g. a Tailscale name) with LOLPRO_ALLOWED_HOSTS=a,b
+ALLOWED_HOSTS = {"127.0.0.1", "localhost", *filter(None, os.environ.get("LOLPRO_ALLOWED_HOSTS", "").split(","))}
 log = logging.getLogger("lolpro")
 
 
@@ -220,8 +223,8 @@ class Handler(BaseHTTPRequestHandler):
         log.debug(fmt, *args)
 
     def _local(self):
-        host = (self.headers.get("Host") or "").split(":")[0]
-        return host in ("127.0.0.1", "localhost")
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]")
+        return host in ALLOWED_HOSTS
 
     def _send(self, code, body, ctype="application/json; charset=utf-8"):
         raw = body if isinstance(body, bytes) else json.dumps(body, default=str).encode()
@@ -262,9 +265,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         engine = self.server.engine
-        origin = self.headers.get("Origin", "")
-        port = self.server.server_address[1]
-        if (not self._local() or origin not in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
+        from urllib.parse import urlsplit
+        origin = urlsplit(self.headers.get("Origin", ""))
+        # Same-site browser requests only: the Origin must be an allowed host, and the session token
+        # (readable only by same-origin pages, as no CORS headers are sent) must match.
+        if (not self._local() or origin.scheme not in ("http", "https") or origin.hostname not in ALLOWED_HOSTS
                 or not secrets.compare_digest(self.headers.get("X-Session-Token", ""), engine.token)):
             return self._send(403, {"error": "forbidden"})
         try:
@@ -294,14 +299,15 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--port", type=int, default=8787)
+    p.add_argument("--host", default="127.0.0.1", help="bind address (0.0.0.0 only inside a container behind a private port)")
     p.add_argument("--no-notify", action="store_true", help="in-app alerts only")
     a = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     engine = Engine(notify=not a.no_notify)
     threading.Thread(target=engine.loop, daemon=True, name="lolpro-engine").start()
-    server = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
+    server = ThreadingHTTPServer((a.host, a.port), Handler)
     server.engine = engine
-    print(f"LOL Pro terminal (paper only): http://127.0.0.1:{a.port}", flush=True)
+    print(f"LOL Pro terminal (paper only): http://{a.host}:{a.port}  allowed hosts: {sorted(ALLOWED_HOSTS)}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

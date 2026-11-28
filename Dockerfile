@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir --no-index --find-links=wheelhouse --require-hash
 RUN python -c "from zoneinfo import ZoneInfo; ZoneInfo('Asia/Kolkata')"
 COPY *.py ./
 COPY research/ ./research/
+COPY pro/ ./pro/
 COPY tools/ ./tools/
 COPY events.csv TRADING_PLAN.md ./
 COPY data/ ./seed-data/

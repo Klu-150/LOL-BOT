@@ -3,7 +3,22 @@
 LOL Pro is the new terminal for this project. It runs on this Mac, trades **on paper only** (no broker,
 no real orders) and replaces the intraday options bot with a positional, regime-based options strategy.
 
-## Start it
+## Open it (cloud, runs 24/7)
+
+LOL Pro runs on the Azure server as its own service, next to the old League engine (which it never touches).
+It is private: reachable only from devices signed in to your Tailscale network.
+
+- On this Mac or any Tailscale device: **http://league-engine.taila6936a.ts.net:8787**
+- On your phone: install the Tailscale app, sign in with the same account, then open the address above and
+  add it to the Home Screen.
+- Phone alerts from the cloud: put `TELEGRAM_BOT_TOKEN=...` and `TELEGRAM_CHAT_ID=...` in `/srv/lolpro/lolpro.env`
+  on the server and restart it (`cd /srv/lolpro && sudo docker compose up -d`). macOS pop-ups only work locally.
+- Redeploy after changes: build/test an image with the guarded installer, then
+  `bash deployment/deploy-lolpro.sh <image-tag>`. Server state lives in `/srv/lolpro/state`.
+
+Run only one copy (cloud **or** this Mac) so there is a single paper account for the trial.
+
+## Start it locally (development)
 
 Double-click **Launch LOL Pro.command** (keep the window open), or run:
 
