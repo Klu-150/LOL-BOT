@@ -29,7 +29,7 @@ if ! docker compose up -d --no-build; then
   exit 1
 fi
 for i in $(seq 1 30); do
-  if curl -fsS --max-time 5 http://127.0.0.1:8787/api/session >/dev/null; then ok=1; break; fi
+  if curl -fsS --max-time 5 http://127.0.0.1:8787/api/auth >/dev/null; then ok=1; break; fi
   sleep 3
 done
 [ "${ok:-}" = 1 ] || { docker compose logs --tail 40; exit 1; }

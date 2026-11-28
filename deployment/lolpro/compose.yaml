@@ -45,7 +45,7 @@ services:
       - default
       - league   # so the League HTTPS gateway can reach lolpro:8787
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/api/session',timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/api/auth',timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3

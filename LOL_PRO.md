@@ -6,15 +6,20 @@ no real orders) and replaces the intraday options bot with a positional, regime-
 ## Open it (cloud, runs 24/7)
 
 LOL Pro runs on the Azure server as its own service, next to the old League engine (which it never touches).
-It is private: reachable only from devices signed in to your Tailscale network.
 
-- On this Mac or any Tailscale device: **http://league-engine.taila6936a.ts.net:8787**
+- **Public link (any phone or computer, sign-in required):**
+  **https://last-of-our-league-dedf75.indiasouthcentral.cloudapp.azure.com/pro/**
+  Sign in with your access key; sessions last 30 days. Only the key's SHA-256 is stored on the server
+  (`LOLPRO_ACCESS_KEY_SHA256` in `/srv/lolpro/lolpro.env`); 8 wrong attempts lock that address for 15 minutes.
+  To replace a lost key, generate a new one and update that hash, then restart LOL Pro.
+- Private link (Tailscale devices, also asks for the key): **http://league-engine.taila6936a.ts.net:8787**
 - On your phone: install the Tailscale app, sign in with the same account, then open the address above and
   add it to the Home Screen.
-- Phone alerts from the cloud: put `TELEGRAM_BOT_TOKEN=...` and `TELEGRAM_CHAT_ID=...` in `/srv/lolpro/lolpro.env`
-  on the server and restart it (`cd /srv/lolpro && sudo docker compose up -d`). macOS pop-ups only work locally.
-- Redeploy after changes: build/test an image with the guarded installer, then
-  `bash deployment/deploy-lolpro.sh <image-tag>`. Server state lives in `/srv/lolpro/state`.
+- **Turn on the Claude assistant:** `bash deployment/set-lolpro-secret.sh ANTHROPIC_API_KEY` (the key is typed
+  hidden and stored only on the server). Phone alerts: the same script with `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+  macOS pop-ups only work when LOL Pro runs locally.
+- **Redeploy after changes:** `bash deployment/build-lolpro-image.sh` (builds and tests on the VM without touching
+  the engine) then `bash deployment/deploy-lolpro.sh <tested-image-tag>`. Server state lives in `/srv/lolpro/state`.
 
 Run only one copy (cloud **or** this Mac) so there is a single paper account for the trial.
 
