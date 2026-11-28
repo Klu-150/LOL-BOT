@@ -216,3 +216,47 @@ def test_server_host_and_origin_allowlist(tmp_path, monkeypatch):
         assert call("POST", "/api/alerts/read", {**ok, "X-Session-Token": "nope"})[0] == 403
     finally:
         httpd.shutdown()
+
+
+def test_login_protects_api_and_issues_signed_session(tmp_path, monkeypatch):
+    from http.server import ThreadingHTTPServer
+    import hashlib
+    import http.client
+    from pro import server
+    monkeypatch.setattr(server, "ACCESS_HASH", hashlib.sha256(b"correct-horse-key").hexdigest())
+    monkeypatch.setattr(server, "_SECRET_FILE", tmp_path / "secret")
+    monkeypatch.setattr(server, "_login_attempts", {})
+    engine = server.Engine(notify=False)
+    engine.alerts = alerts.AlertCenter(store=tmp_path / "a.json", notify=False)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    httpd.engine = engine
+    port = httpd.server_address[1]
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    base = {"Host": "127.0.0.1", "Origin": f"http://127.0.0.1:{port}", "Content-Type": "application/json"}
+
+    def call(method, path, headers=None, body=None):
+        c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        c.request(method, path, body=json.dumps(body).encode() if body is not None else None, headers={**base, **(headers or {})})
+        r = c.getresponse()
+        data, cookie = r.read(), r.getheader("Set-Cookie")
+        c.close()
+        return r.status, data, cookie
+    try:
+        assert call("GET", "/")[0] == 200                      # the page shell loads without data
+        assert call("GET", "/api/state")[0] == 401
+        assert json.loads(call("GET", "/api/auth")[1]) == {"login_required": True, "authenticated": False}
+        assert call("POST", "/api/login", body={"key": "wrong-key-123"})[0] == 401
+        status, _, cookie = call("POST", "/api/login", body={"key": "correct-horse-key"}, headers={"X-Forwarded-Proto": "https"})
+        assert status == 200 and "HttpOnly" in cookie and "SameSite=Strict" in cookie and "Secure" in cookie
+        session = {"Cookie": cookie.split(";")[0]}
+        assert call("GET", "/api/state", session)[0] == 200
+        token = json.loads(call("GET", "/api/session", session)[1])["token"]
+        assert call("POST", "/api/alerts/read", {**session, "X-Session-Token": token}, {})[0] == 200
+        assert call("POST", "/api/alerts/read", {"X-Session-Token": token}, {})[0] == 401   # token without session
+        assert call("GET", "/api/state", {"Cookie": "lolpro_session=9999999999.forged"})[0] == 401
+        for _ in range(8):
+            call("POST", "/api/login", body={"key": "wrong-key-123"})
+        assert call("POST", "/api/login", body={"key": "correct-horse-key"})[0] == 429  # attempt limit
+    finally:
+        httpd.shutdown()
+    assert not server.valid_session(server.make_session(now=0))  # expired after 30 days

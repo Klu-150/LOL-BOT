@@ -1,13 +1,32 @@
 {$LEAGUE_DOMAIN} {
     encode zstd gzip
-    request_body {
+
+    # LOL Pro paper terminal (separate container, login required) at /pro/
+    @pro path /pro /pro/*
+    @notpro not path /pro /pro/*
+    request_body @notpro {
         max_size 2KB
     }
-    reverse_proxy engine:8765 {
-        header_up X-League-Client-IP {remote_host}
-        transport http {
-            dial_timeout 5s
-            response_header_timeout 30s
+    request_body @pro {
+        max_size 64KB
+    }
+    redir /pro /pro/ 308
+    handle_path /pro/* {
+        reverse_proxy lolpro:8787 {
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 120s
+            }
+        }
+    }
+
+    handle {
+        reverse_proxy engine:8765 {
+            header_up X-League-Client-IP {remote_host}
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 30s
+            }
         }
     }
     header X-Content-Type-Options nosniff

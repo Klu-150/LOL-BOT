@@ -7,6 +7,8 @@ that raises alerts (in-app, macOS notification, optional Telegram).
 """
 import argparse
 from datetime import date, datetime
+import hashlib
+import hmac
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -216,6 +218,59 @@ def _short_name(name):
     return name.strip()
 
 
+# ------------------------------------------------------------------ login
+# When LOLPRO_ACCESS_KEY_SHA256 is set (required for any public deployment), every API call needs a
+# signed session cookie obtained by entering the access key. Only its SHA-256 is stored on the server.
+ACCESS_HASH = os.environ.get("LOLPRO_ACCESS_KEY_SHA256", "").strip().lower()
+SESSION_DAYS = 30
+LOGIN_WINDOW, LOGIN_ATTEMPTS = 900, 8
+_SECRET_FILE = ROOT / "paper" / "pro_session_secret"
+_login_attempts, _login_lock = {}, threading.Lock()
+
+
+def _session_secret():
+    try:
+        return _SECRET_FILE.read_bytes()
+    except OSError:
+        value = secrets.token_bytes(32)
+        _SECRET_FILE.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(_SECRET_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(value)
+        return value
+
+
+def make_session(now=None):
+    exp = int((time.time() if now is None else now) + SESSION_DAYS * 86400)
+    mac = hmac.new(_session_secret(), str(exp).encode(), hashlib.sha256).hexdigest()
+    return f"{exp}.{mac}"
+
+
+def valid_session(token, now=None):
+    exp, _, mac = (token or "").partition(".")
+    if not exp.isdigit() or int(exp) < (time.time() if now is None else now):
+        return False
+    good = hmac.new(_session_secret(), exp.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(mac, good)
+
+
+def key_matches(key):
+    if not ACCESS_HASH or not isinstance(key, str) or not 8 <= len(key) <= 200:
+        return False
+    return hmac.compare_digest(hashlib.sha256(key.encode()).hexdigest(), ACCESS_HASH)
+
+
+def _allow_login_attempt(ip, now=None):
+    now = now or time.monotonic()
+    with _login_lock:
+        recent = [t for t in _login_attempts.get(ip, []) if now - t < LOGIN_WINDOW]
+        if len(recent) >= LOGIN_ATTEMPTS:
+            _login_attempts[ip] = recent
+            return False
+        _login_attempts[ip] = recent + [now]
+        return True
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "LOLPro/1.0"
 
@@ -226,9 +281,27 @@ class Handler(BaseHTTPRequestHandler):
         host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]")
         return host in ALLOWED_HOSTS
 
-    def _send(self, code, body, ctype="application/json; charset=utf-8"):
+    def _cookie(self):
+        for part in (self.headers.get("Cookie") or "").split(";"):
+            name, _, value = part.strip().partition("=")
+            if name == "lolpro_session":
+                return value
+        return ""
+
+    def _authed(self):
+        return not ACCESS_HASH or valid_session(self._cookie())
+
+    def _client_ip(self):
+        # The public gateway (Caddy) and Tailscale both set X-Forwarded-For; the container port is loopback-only.
+        return (self.headers.get("X-Forwarded-For") or self.client_address[0]).split(",")[0].strip()
+
+    def _send(self, code, body, ctype="application/json; charset=utf-8", cookie=None):
         raw = body if isinstance(body, bytes) else json.dumps(body, default=str).encode()
         self.send_response(code)
+        if cookie is not None:
+            secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
+            age = SESSION_DAYS * 86400 if cookie else 0
+            self.send_header("Set-Cookie", f"lolpro_session={cookie}; Max-Age={age}; Path=/; HttpOnly; SameSite=Strict{secure}")
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(raw)))
         self.send_header("Cache-Control", "no-store")
@@ -245,6 +318,10 @@ class Handler(BaseHTTPRequestHandler):
         if path in STATIC:
             name, ctype = STATIC[path]
             return self._send(200, (WEB / name).read_bytes(), ctype)
+        if path == "/api/auth":
+            return self._send(200, {"login_required": bool(ACCESS_HASH), "authenticated": self._authed()})
+        if path.startswith("/api/") and not self._authed():
+            return self._send(401, {"error": "login required"})
         if path == "/api/session":
             return self._send(200, {"token": engine.token, "mode": "paper"})
         if path == "/api/state":
@@ -269,14 +346,25 @@ class Handler(BaseHTTPRequestHandler):
         origin = urlsplit(self.headers.get("Origin", ""))
         # Same-site browser requests only: the Origin must be an allowed host, and the session token
         # (readable only by same-origin pages, as no CORS headers are sent) must match.
-        if (not self._local() or origin.scheme not in ("http", "https") or origin.hostname not in ALLOWED_HOSTS
-                or not secrets.compare_digest(self.headers.get("X-Session-Token", ""), engine.token)):
-            return self._send(403, {"error": "forbidden"})
+        same_site = self._local() and origin.scheme in ("http", "https") and origin.hostname in ALLOWED_HOSTS
         try:
             length = min(int(self.headers.get("Content-Length", 0)), 64_000)
             body = json.loads(self.rfile.read(length) or b"{}")
         except ValueError:
             return self._send(400, {"error": "invalid JSON"})
+        if self.path == "/api/login" and same_site:
+            if not ACCESS_HASH:
+                return self._send(200, {"ok": True})
+            if not _allow_login_attempt(self._client_ip()):
+                return self._send(429, {"error": "Too many attempts. Wait 15 minutes and try again."})
+            if not key_matches(body.get("key")):
+                return self._send(401, {"error": "That access key is not correct."})
+            return self._send(200, {"ok": True}, cookie=make_session())
+        if self.path == "/api/logout" and same_site:
+            return self._send(200, {"ok": True}, cookie="")
+        if (not same_site or not self._authed()
+                or not secrets.compare_digest(self.headers.get("X-Session-Token", ""), engine.token)):
+            return self._send(403 if self._authed() else 401, {"error": "forbidden"})
         if self.path == "/api/chat":
             question = str(body.get("question", "")).strip()[:2000]
             if not question:

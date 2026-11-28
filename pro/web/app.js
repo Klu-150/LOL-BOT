@@ -38,19 +38,26 @@ const regimeChip = (g) => el("span", { class: `regime r-${g || "warmup"}`, text:
 
 // ------------------------------------------------------------------ network
 async function session() {
-  const r = await fetch("/api/session"); S.token = (await r.json()).token;
+  const r = await fetch("api/session"); S.token = (await r.json()).token;
 }
 async function post(path, body) {
   if (!S.token) await session();
   let r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": S.token }, body: JSON.stringify(body || {}) });
   if (r.status === 403) { await session(); r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": S.token }, body: JSON.stringify(body || {}) }); }
+  if (r.status === 401) { showLogin(true); throw new Error("Please sign in again"); }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
   return r.json();
 }
+function showLogin(show) {
+  $("login").hidden = !show;
+  if (show) setTimeout(() => $("loginKey").focus(), 50);
+}
 async function load() {
   try {
-    const r = await fetch("/api/state", { cache: "no-store" });
+    const r = await fetch("api/state", { cache: "no-store" });
+    if (r.status === 401) { showLogin(true); return; }
     if (!r.ok) throw new Error(r.statusText);
+    showLogin(false);
     S.state = await r.json();
     $("offline").hidden = true;
     render();
@@ -286,7 +293,7 @@ function closeStock() {
 async function loadStock() {
   const sym = S.stock; if (!sym) return;
   try {
-    const r = await fetch("/api/stock?symbol=" + encodeURIComponent(sym), { cache: "no-store" });
+    const r = await fetch("api/stock?symbol=" + encodeURIComponent(sym), { cache: "no-store" });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
     if (S.stock !== sym) return;
     S.stockData = d; renderStock();
@@ -317,7 +324,7 @@ function renderStock() {
 }
 async function loadStockNews(symbol) {
   try {
-    const r = await fetch("/api/company-news?symbol=" + encodeURIComponent(symbol));
+    const r = await fetch("api/company-news?symbol=" + encodeURIComponent(symbol));
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
     if (S.stock === symbol) fill($("dNews"), d.items.length ? d.items.slice(0, 10).map(newsItem) : el("li", { class: "muted", text: "No recent news." }));
   } catch (e) { fill($("dNews"), el("li", { class: "muted", text: "News unavailable: " + e.message })); }
@@ -358,7 +365,7 @@ async function loadCompany(symbol) {
   if (!symbol) return;
   fill($("companyNews"), el("li", { class: "muted", text: "Loading…" }));
   try {
-    const r = await fetch("/api/company-news?symbol=" + encodeURIComponent(symbol));
+    const r = await fetch("api/company-news?symbol=" + encodeURIComponent(symbol));
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
     fill($("companyNews"), d.items.length ? d.items.slice(0, 15).map(newsItem) : el("li", { class: "muted", text: "No recent news." }));
@@ -444,7 +451,7 @@ async function ask(text) {
   S.chat.push({ role: "user", content: text }, { role: "assistant", content: "Thinking…", typing: true });
   chatRender();
   try {
-    const r = await post("/api/chat", { question: text, history });
+    const r = await post("api/chat", { question: text, history });
     S.chat.pop(); S.chat.push({ role: "assistant", content: r.answer, source: r.source });
   } catch (e) {
     S.chat.pop(); S.chat.push({ role: "assistant", content: "Sorry, I could not answer: " + e.message, source: "error" });
@@ -461,7 +468,7 @@ function route() {
   for (const p of Object.keys(TITLES)) $("page-" + p).hidden = p !== S.page;
   document.querySelectorAll("[data-page]").forEach((a) => a.classList.toggle("on", a.dataset.page === S.page));
   $("pageTitle").textContent = TITLES[S.page];
-  if (S.page === "alerts" && S.state?.alerts?.some((a) => !a.read)) post("/api/alerts/read").then(load).catch(() => {});
+  if (S.page === "alerts" && S.state?.alerts?.some((a) => !a.read)) post("api/alerts/read").then(load).catch(() => {});
   render();
   if (!sub) window.scrollTo(0, 0);
 }
@@ -475,7 +482,7 @@ function init() {
     try { localStorage.setItem("lolpro.theme", document.documentElement.dataset.theme); } catch (e) { /* ignore */ }
     render();
   };
-  $("refreshBtn").onclick = () => post("/api/refresh").then(() => setTimeout(load, 4000)).catch(() => {});
+  $("refreshBtn").onclick = () => post("api/refresh").then(() => setTimeout(load, 4000)).catch(() => {});
   $("newsFilter").addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
     S.newsFilter = b.dataset.f;
@@ -488,10 +495,10 @@ function init() {
   $("chatText").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("chatForm").requestSubmit(); } });
   $("suggest").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) ask(b.textContent); });
   $("clearChat").onclick = () => { S.chat = []; chatRender(); };
-  $("markRead").onclick = () => post("/api/alerts/read").then(load).catch(() => {});
+  $("markRead").onclick = () => post("api/alerts/read").then(load).catch(() => {});
   $("runDaily").onclick = async () => {
     $("runDaily").disabled = true; $("runMsg").textContent = "Running the engine…";
-    try { const r = await post("/api/run-daily"); $("runMsg").textContent = r.status === "ok" ? `Done: ${r.plan.action.replaceAll("_", " ").toLowerCase()}` : r.status === "busy" ? "Already running" : "Failed: " + r.error; }
+    try { const r = await post("api/run-daily"); $("runMsg").textContent = r.status === "ok" ? `Done: ${r.plan.action.replaceAll("_", " ").toLowerCase()}` : r.status === "busy" ? "Already running" : "Failed: " + r.error; }
     catch (e) { $("runMsg").textContent = "Failed: " + e.message; }
     $("runDaily").disabled = false; load();
   };
@@ -508,6 +515,18 @@ function init() {
   });
   $("drawerClose").onclick = closeStock; $("drawerBackdrop").onclick = closeStock;
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.stock) closeStock(); });
+  $("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault(); $("loginBtn").disabled = true; $("loginErr").textContent = "";
+    try {
+      const r = await fetch("api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: $("loginKey").value }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Sign-in failed");
+      $("loginKey").value = ""; S.token = null; showLogin(false); load();
+    } catch (err) { $("loginErr").textContent = err.message; }
+    $("loginBtn").disabled = false;
+  });
+  fetch("api/auth").then((r) => r.json()).then((a) => { $("signOut").hidden = !a.login_required; }).catch(() => {});
+  $("signOut").onclick = async () => { await fetch("api/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); S.state = null; showLogin(true); };
   window.addEventListener("hashchange", route);
   let resize; window.addEventListener("resize", () => { clearTimeout(resize); resize = setTimeout(render, 150); });
   chatRender(); route(); load();

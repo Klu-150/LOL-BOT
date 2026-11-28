@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>LOL Pro Terminal</title>
   <meta name="color-scheme" content="light dark">
-  <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="app">
   <aside class="sidebar" aria-label="Main">
     <div class="brand">
-      <img src="/icon.svg" alt="" width="32" height="32">
+      <img src="icon.svg" alt="" width="32" height="32">
       <div><strong>LOL Pro</strong><span>Nifty paper terminal</span></div>
     </div>
     <nav class="nav" id="nav">
@@ -24,6 +24,7 @@
       <a href="#alerts" data-page="alerts"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4zM10 20a2 2 0 004 0"/></svg><span>Alerts</span><b class="count" id="alertCount" hidden></b></a>
       <a href="#strategy" data-page="strategy"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span>How it works</span></a>
     </nav>
+    <button class="btn ghost signout" id="signOut" hidden>Sign out</button>
     <div class="paper-note">
       <strong>Paper trading only</strong>
       <span>No broker is connected. Option prices are modelled from India VIX.</span>
@@ -275,6 +276,16 @@
   <a href="#performance" data-page="performance"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7"/></svg>Results</a>
   <a href="#alerts" data-page="alerts"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/></svg>Alerts</a>
 </nav>
-<script src="/app.js"></script>
+<div class="login" id="login" hidden>
+  <form class="login-card card" id="loginForm">
+    <img src="icon.svg" alt="" width="44" height="44">
+    <h2>LOL Pro</h2>
+    <p class="muted">Paper-trading terminal. Enter your access key to continue.</p>
+    <input type="password" id="loginKey" autocomplete="current-password" placeholder="Access key" aria-label="Access key" required minlength="8">
+    <button class="btn" type="submit" id="loginBtn">Sign in</button>
+    <p class="small down" id="loginErr" role="alert"></p>
+  </form>
+</div>
+<script src="app.js"></script>
 </body>
 </html>
