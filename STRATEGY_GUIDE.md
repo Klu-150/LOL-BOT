@@ -132,3 +132,21 @@ That account holds an index ETF fully while the engine is long, and earns 6%/yr 
 otherwise. Orders decided today fill at the next session's open.
 `sh pro/install_schedule.sh` schedules it weekdays at 15:20 on this Mac (the Mac must be
 awake); `sh pro/install_schedule.sh --remove` removes it.
+
+## 9. Which options trade fits the signals (28 Nov 2026)
+
+`python -m pro.options_research` trades the engine's 67 long signals (2016–2026) with five vehicles, one lot,
+rolling options 7 days before expiry:
+
+| Vehicle | Total per lot | 2016–22 | 2023–26 | Profit factor |
+|---|---|---|---|---|
+| Nifty futures (benchmark, unlimited risk) | +₹3,21,732 | +₹1,12,548 | +₹2,09,184 | 1.61 |
+| ATM bull call debit spread, 28 DTE | −₹63,893 | −₹61,486 | −₹2,407 | 0.63 |
+| 0.70/0.30-delta call debit spread, 56 DTE | −₹25,055 | −₹55,870 | +₹30,815 | 0.89 |
+| Deep ITM call, 56 DTE | −₹50,530 | −₹1,05,215 | +₹54,685 | 0.91 |
+| **Bull put credit spread, 0.30 delta, 300 wide, 35 DTE** | **+₹5,444** | −₹6,568 | +₹12,012 | 1.06 |
+
+With half the modelled slippage the bull put spread rises to +₹23,714 (profit factor 1.30, positive in both
+eras, smallest drawdown). Buying options loses to time decay and to VIX falling during rallies. The LOL Pro
+paper book therefore uses the bull put credit spread (`pro/options_paper.py`). Futures capture far more of the
+edge but carry unlimited risk; the index ETF remains the lowest-risk way to follow the signals.

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>LOL Pro Terminal</title>
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" aria-label="Main">
+    <div class="brand">
+      <img src="/icon.svg" alt="" width="32" height="32">
+      <div><strong>LOL Pro</strong><span>Nifty paper terminal</span></div>
+    </div>
+    <nav class="nav" id="nav">
+      <a href="#overview" data-page="overview"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg><span>Overview</span></a>
+      <a href="#markets" data-page="markets"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg><span>Markets</span></a>
+      <a href="#news" data-page="news"><svg viewBox="0 0 24 24"><path d="M4 5h13v14H6a2 2 0 01-2-2zM17 9h3v8a2 2 0 01-2 2M8 9h5M8 13h5"/></svg><span>News</span><b class="dot" id="newsDot" hidden></b></a>
+      <a href="#assistant" data-page="assistant"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg><span>Assistant</span></a>
+      <a href="#performance" data-page="performance"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Performance</span></a>
+      <a href="#alerts" data-page="alerts"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4zM10 20a2 2 0 004 0"/></svg><span>Alerts</span><b class="count" id="alertCount" hidden></b></a>
+      <a href="#strategy" data-page="strategy"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span>How it works</span></a>
+    </nav>
+    <div class="paper-note">
+      <strong>Paper trading only</strong>
+      <span>No broker is connected. Option prices are modelled from India VIX.</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-title"><h1 id="pageTitle">Overview</h1><span id="marketStatus" class="chip">—</span></div>
+      <div class="topbar-actions">
+        <span class="updated" id="updated">Connecting…</span>
+        <button class="icon-btn" id="refreshBtn" title="Refresh market and news" aria-label="Refresh"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.7M20 4v5h-5"/></svg></button>
+        <button class="icon-btn" id="themeBtn" title="Switch theme" aria-label="Switch theme"><svg viewBox="0 0 24 24"><path d="M21 13A9 9 0 1111 3a7 7 0 0010 10z"/></svg></button>
+      </div>
+    </header>
+    <div class="banner" id="offline" hidden>Terminal server is not responding. Start it with <code>.venv/bin/python -m pro.server</code>; retrying…</div>
+
+    <!-- OVERVIEW -->
+    <section class="page" id="page-overview">
+      <div class="hero card" id="hero">
+        <div class="hero-main">
+          <span class="eyebrow">What the bot is doing</span>
+          <h2 id="heroHeadline">Loading…</h2>
+          <p id="heroReason"></p>
+          <div class="hero-tags" id="heroTags"></div>
+        </div>
+        <div class="hero-side">
+          <span class="eyebrow">Next decision</span>
+          <strong id="nextRun">15:20 IST</strong>
+          <span class="muted" id="asOf"></span>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi card"><span>Paper account</span><strong id="kEquity">—</strong><em id="kEquitySub"></em></div>
+        <div class="kpi card"><span>Open position P&amp;L</span><strong id="kOpen">—</strong><em id="kOpenSub"></em></div>
+        <div class="kpi card"><span>Nifty 50</span><strong id="kNifty">—</strong><em id="kNiftySub"></em></div>
+        <div class="kpi card"><span>India VIX</span><strong id="kVix">—</strong><em id="kVixSub"></em></div>
+        <div class="kpi card"><span>News risk</span><strong id="kRisk">—</strong><em id="kRiskSub"></em></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h3>Nifty today</h3><span class="muted" id="intradayNote">5-minute</span></div>
+          <div class="chart" id="intradayChart"></div>
+        </div>
+        <div class="card" id="positionCard">
+          <div class="card-head"><h3>Open position</h3><span class="chip" id="posChip">—</span></div>
+          <div id="positionBody"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h3>Latest alerts</h3><a href="#alerts" class="link">All alerts</a></div>
+          <ul class="list" id="ovAlerts"></ul>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Market-moving news</h3><a href="#news" class="link">All news</a></div>
+          <ul class="list" id="ovNews"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- MARKETS -->
+    <section class="page" id="page-markets" hidden>
+      <div class="card">
+        <div class="card-head"><h3>Nifty 50 — last 12 months</h3>
+          <div class="legend"><i class="l-price"></i>Close <i class="l-ema50"></i>EMA 50 <i class="l-ema200"></i>EMA 200</div></div>
+        <div class="chart tall" id="dailyChart"></div>
+        <div class="regime-strip" id="regimeStrip" aria-label="Market regime by day"></div>
+        <div class="legend small" id="regimeLegend"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Nifty heavyweights</h3><span class="muted" id="breadth"></span></div>
+        <div class="table-wrap"><table class="table" id="stocks">
+          <thead><tr><th>Company</th><th class="num">Price</th><th class="num">Change</th><th class="hide-sm">Day range</th><th></th></tr></thead>
+          <tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- NEWS -->
+    <section class="page" id="page-news" hidden>
+      <div class="grid-news">
+        <div class="card">
+          <div class="card-head">
+            <div class="segmented" id="newsFilter" role="tablist">
+              <button data-f="all" class="on">All</button><button data-f="moving">Market-moving</button>
+              <button data-f="negative">Negative</button><button data-f="positive">Positive</button><button data-f="company">Companies</button>
+            </div>
+            <input type="search" id="newsSearch" placeholder="Search headlines" aria-label="Search headlines">
+          </div>
+          <ul class="news" id="newsList"></ul>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <h3>News risk</h3>
+            <div class="gauge"><div class="gauge-bar"><i id="riskFill"></i></div><strong id="riskValue">—</strong></div>
+            <p class="muted" id="riskText"></p>
+            <p class="small">The bot uses news only as a safety brake: while risk is <b>high</b> it will not open new
+              positions. Headlines never trigger a buy or sell on their own.</p>
+          </div>
+          <div class="card">
+            <h3>Company news</h3>
+            <select id="companySelect" aria-label="Choose a company"></select>
+            <ul class="news compact" id="companyNews"><li class="muted">Choose a company to load its latest news.</li></ul>
+          </div>
+          <div class="card"><h3>Sources</h3><ul class="list small" id="sources"></ul></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ASSISTANT -->
+    <section class="page" id="page-assistant" hidden>
+      <div class="chat card">
+        <div class="chat-head"><div><h3>Trading assistant</h3><span class="muted" id="aiMode"></span></div>
+          <button class="btn ghost" id="clearChat">New chat</button></div>
+        <div class="chat-log" id="chatLog" aria-live="polite"></div>
+        <div class="suggest" id="suggest">
+          <button>How is the market running today?</button><button>What is the bot doing and why?</button>
+          <button>How is my paper performance?</button><button>Any issues I should know about?</button>
+          <button>What does the news say?</button><button>Am I ready to trade with real money?</button>
+        </div>
+        <form class="chat-input" id="chatForm"><textarea id="chatText" rows="1" placeholder="Ask about the market, the bot, trades or news…" aria-label="Message"></textarea>
+          <button class="btn" type="submit" id="sendBtn">Send</button></form>
+      </div>
+    </section>
+
+    <!-- PERFORMANCE -->
+    <section class="page" id="page-performance" hidden>
+      <div class="card trial" id="trialCard">
+        <div class="card-head"><h3>One-month paper trial</h3><span class="chip" id="trialChip">—</span></div>
+        <p id="trialVerdict"></p>
+        <div class="progress"><i id="trialProgress"></i></div>
+        <div class="grid-3">
+          <div><h4>Go-live checks</h4><ul class="checks" id="trialChecks"></ul></div>
+          <div><h4>Pros</h4><ul class="bullets good" id="trialPros"></ul></div>
+          <div><h4>Cons</h4><ul class="bullets bad" id="trialCons"></ul></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Paper equity</h3>
+          <div class="legend"><i class="l-price"></i>Options book <i class="l-ema200"></i>ETF comparison</div></div>
+        <div class="chart" id="equityChart"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Options trades</h3><span class="muted">Bull put credit spreads</span></div>
+        <div class="table-wrap"><table class="table" id="tradesTable">
+          <thead><tr><th>Spread</th><th>Opened</th><th>Closed</th><th class="hide-sm">Why</th><th class="num">Lots</th><th class="num">P&amp;L</th></tr></thead>
+          <tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <h3>Research backtest (2016–2026)</h3>
+        <div class="stat-row" id="backtestStats"></div>
+        <p class="small muted">Index-point results of the same engine on 10 years of daily data with costs. Past results do not
+          guarantee future returns; buy-and-hold earned more but fell much further in bad years.</p>
+      </div>
+    </section>
+
+    <!-- ALERTS -->
+    <section class="page" id="page-alerts" hidden>
+      <div class="grid-2 wide-left">
+        <div class="card">
+          <div class="card-head"><h3>Alerts</h3><button class="btn ghost" id="markRead">Mark all read</button></div>
+          <ul class="alerts" id="alertList"></ul>
+        </div>
+        <div class="stack">
+          <div class="card"><h3>System health</h3><ul class="health" id="health"></ul>
+            <button class="btn" id="runDaily">Run decision now</button><p class="small muted" id="runMsg"></p></div>
+          <div class="card"><h3>Where alerts go</h3><ul class="health" id="channels"></ul>
+            <p class="small muted">For phone alerts, set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code> before starting the server.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STRATEGY -->
+    <section class="page" id="page-strategy" hidden>
+      <div class="card prose">
+        <h3>How the bot thinks</h3>
+        <p>Every trading day after 15:20 IST the bot reads the completed daily chart, India VIX and the news,
+          decides which market regime it is in, and follows that regime's playbook. Orders fill at the next morning's open.</p>
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Regime</th><th>How it is detected</th><th>What the bot does</th></tr></thead>
+          <tbody>
+            <tr><td><span class="regime r-uptrend">Uptrend</span></td><td>Price above the 200-day average, 50-day above 200-day, ADX ≥ 20</td><td>Buys pullbacks (RSI2 &lt; 10), 55-day breakouts, or rides strong trends</td></tr>
+            <tr><td><span class="regime r-transition">Transition</span></td><td>Trend turning, averages not yet aligned</td><td>Only a confirmed 55-day breakout</td></tr>
+            <tr><td><span class="regime r-range">Range</span></td><td>ADX below 20: sideways market</td><td>Stays in cash</td></tr>
+            <tr><td><span class="regime r-downtrend">Downtrend</span></td><td>Price and 50-day below the 200-day average</td><td>Stays in cash (shorting lost money in 10-year tests)</td></tr>
+            <tr><td><span class="regime r-stress">Stress</span></td><td>India VIX ≥ 25 or in its top 15% of the year</td><td>Stays in cash</td></tr>
+          </tbody></table></div>
+        <h4>The options trade</h4>
+        <p>When the engine is long, the bot <b>sells a bull put credit spread</b>: it sells a put near 0.30 delta and buys a put
+          300 points lower, in the monthly expiry at least 28 days away. It collects premium, gains from time decay and from VIX
+          falling in rallies, and its worst-case loss is fixed when it opens. It rolls to the next month with 7 days left and
+          closes when the engine exits. Risk per trade is capped at 4% of the account.</p>
+        <h4>Why not intraday options?</h4>
+        <p>The old bot opened spreads after the morning move and closed them at 15:15 the same day. Spreads earn from time
+          decay over days, so in a few hours they paid four legs of costs and earned almost nothing: 30% winners in its
+          backtest. Of all option structures tested on 10 years of signals, only the positional bull put spread made money
+          in both 2016–22 and 2023–26.</p>
+        <h4>Learning and safety</h4>
+        <ul>
+          <li>A walk-forward kill switch switches off any strategy whose recent record in the current regime turns clearly negative.</li>
+          <li>News is a brake, not an accelerator: high negative news risk blocks new entries.</li>
+          <li>Alerts fire for new signals, stop breaches, data or feed failures, stale data and large spread losses.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+
+<nav class="tabbar" id="tabbar" aria-label="Sections">
+  <a href="#overview" data-page="overview"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg>Home</a>
+  <a href="#markets" data-page="markets"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>Markets</a>
+  <a href="#news" data-page="news"><svg viewBox="0 0 24 24"><path d="M4 5h13v14H6a2 2 0 01-2-2zM17 9h3v8a2 2 0 01-2 2"/></svg>News</a>
+  <a href="#assistant" data-page="assistant"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Ask</a>
+  <a href="#performance" data-page="performance"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7"/></svg>Results</a>
+  <a href="#alerts" data-page="alerts"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/></svg>Alerts</a>
+</nav>
+<script src="/app.js"></script>
+</body>
+</html>

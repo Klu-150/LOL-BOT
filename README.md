@@ -1,5 +1,8 @@
 # Last of Our League
 
+**New: LOL Pro terminal** — regime-based positional options paper trading with live news,
+an AI assistant and alerts. Double-click **Launch LOL Pro.command** or see [LOL_PRO.md](LOL_PRO.md).
+
 **iPhone:** Open the [app setup page](https://nifty-research-terminal.nearbydrape.chatgpt.site/#mobile)
 in Safari and add it to your Home Screen. The app displays saved records until
 an always-on engine is connected. See [CLOUD_SETUP.md](CLOUD_SETUP.md) for the
