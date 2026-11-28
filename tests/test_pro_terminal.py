@@ -260,3 +260,54 @@ def test_login_protects_api_and_issues_signed_session(tmp_path, monkeypatch):
     finally:
         httpd.shutdown()
     assert not server.valid_session(server.make_session(now=0))  # expired after 30 days
+
+
+def test_pending_order_fills_at_open_once_and_daily_run_does_not_refill(tmp_path, monkeypatch):
+    monkeypatch.setattr(daily, "OPTIONS_LEDGER", tmp_path / "opt.json")
+    rows = [("2026-11-27", 25_600, 25_607), ("2026-11-30", 25_650, 25_700)]
+    daily.update_options_ledger({"as_of_bar": rows[0][0], "action": "BUY_AT_NEXT_OPEN", "generated_at": "x"}, _frame(rows[:1]))
+    assert daily.fill_pending_at_open(25_650, date(2026, 11, 27)) is None      # not a new session yet
+    fill = daily.fill_pending_at_open(25_650, date(2026, 11, 30))
+    assert fill["order"] == "OPEN" and "Opened" in fill["message"]
+    led = json.loads((tmp_path / "opt.json").read_text())
+    assert "pending" not in led and led["position"]["filled_live"] and led["position"]["opened"] == "2026-11-30"
+    assert daily.fill_pending_at_open(25_650, date(2026, 11, 30)) is None      # never twice
+    # The 15:20 run for the same day marks the position and must not open a second spread.
+    once = json.dumps(led["position"]["legs"])
+    led = daily.update_options_ledger({"as_of_bar": rows[1][0], "action": "HOLD", "generated_at": "y"}, _frame(rows))
+    assert json.dumps(led["position"]["legs"]) == once and led["trades"] == []
+    assert led["position"]["mark"]["as_of"] == "2026-11-30"
+    # Same opening price as the daily path would have used: credit identical to a ledger filled at 15:20.
+    monkeypatch.setattr(daily, "OPTIONS_LEDGER", tmp_path / "opt2.json")
+    daily.update_options_ledger({"as_of_bar": rows[0][0], "action": "BUY_AT_NEXT_OPEN", "generated_at": "x"}, _frame(rows[:1]))
+    later = daily.update_options_ledger({"as_of_bar": rows[1][0], "action": "HOLD", "generated_at": "y"}, _frame(rows))
+    assert later["position"]["credit_pts"] == led["position"]["credit_pts"]
+
+
+def test_pending_close_fills_at_open(tmp_path, monkeypatch):
+    monkeypatch.setattr(daily, "OPTIONS_LEDGER", tmp_path / "opt.json")
+    rows = [("2026-12-01", 25_000, 25_010), ("2026-12-02", 25_020, 25_030), ("2026-12-03", 24_900, 24_950)]
+    daily.update_options_ledger({"as_of_bar": rows[0][0], "action": "BUY_AT_NEXT_OPEN", "generated_at": "a"}, _frame(rows[:1]))
+    daily.update_options_ledger({"as_of_bar": rows[1][0], "action": "SELL_AT_NEXT_OPEN", "generated_at": "b"}, _frame(rows[:2]))
+    fill = daily.fill_pending_at_open(24_900, date(2026, 12, 3))
+    led = json.loads((tmp_path / "opt.json").read_text())
+    assert fill["order"] == "CLOSE" and led["position"] is None and led["trades"][-1]["reason"] == "engine exit"
+
+
+def test_live_mark_follows_market_and_open_fill_waits_for_todays_open(tmp_path, monkeypatch):
+    from pro import server
+    monkeypatch.setattr(daily, "OPTIONS_LEDGER", tmp_path / "opt.json")
+    engine = server.Engine(notify=False)
+    engine.alerts = alerts.AlertCenter(store=tmp_path / "a.json", notify=False)
+    pos = options_paper.open_spread(500_000, 25_600, date(2026, 11, 30), 16.5)
+    ledger = {"realised_rs": 0.0, "position": pos}
+    engine.market.data = {"nifty": {"price": 26_000, "as_of": "2026-12-02", "open": 25_900},
+                          "vix": {"price": 15.0}, "session": {"reason": "regular_session"}}
+    up = engine.live_options(ledger)
+    engine.market.data["nifty"]["price"] = 25_000
+    down = engine.live_options(ledger)
+    assert up["position"]["live_mark"]["pnl_rs"] > down["position"]["live_mark"]["pnl_rs"]
+    assert up["position"]["live_mark"]["session_open"] and up["live_equity"] > down["live_equity"]
+    now = datetime(2026, 12, 3, 9, 25, tzinfo=server.ZONE)
+    assert engine._due_open_fill(now) and not engine._due_open_fill(now.replace(hour=9, minute=10))
+    assert engine.fill_at_open(now) is None and engine.health.get("open_fill_day") is None  # quote is from 2 Dec

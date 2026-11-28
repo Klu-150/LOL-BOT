@@ -120,6 +120,50 @@ def update_options_ledger(result, f):
     return led
 
 
+def fill_pending_at_open(open_px, day, path=None):
+    """Record a pending options order at today's opening price, as soon as the session has opened.
+
+    Uses exactly what the 15:20 run would use (today's open, the prior close's VIX), so the books are
+    identical; the later daily run sees no pending order and only marks/rolls the position.
+    Returns a description of the fill, or None when nothing was pending.
+    """
+    path = path or OPTIONS_LEDGER
+    if not path.exists():
+        return None
+    led = json.loads(path.read_text())
+    order, pos = led.get("pending"), led.get("position")
+    if not order or not led.get("last_bar") or str(day) <= led["last_bar"]:
+        return None
+    vix = led.get("last_vix")
+    if not vix:
+        return None
+    if order == "OPEN" and not pos:
+        pos = options_paper.open_spread(CAPITAL + led["realised_rs"], float(open_px), day, vix)
+        led["position"] = pos
+        if pos:
+            pos["filled_live"] = True
+            pos["mark"] = options_paper.mark(pos, float(open_px), day, vix)
+        what = f"Opened {pos['label']}, {pos['lots']} lot(s), credit {pos['credit_pts']} pts" if pos else \
+            "Entry skipped: the spread did not fit the risk budget"
+    elif order == "CLOSE" and pos:
+        value = options_paper.mark(pos, float(open_px), day, vix)
+        _realise(led, pos, value, day, "engine exit")
+        led["position"] = None
+        what = f"Closed {pos['label']} at the open: P&L ₹{value['pnl_rs']:,.0f}"
+    else:
+        led.pop("pending", None)
+        path.write_text(json.dumps(led, indent=2))
+        return None
+    led.pop("pending", None)
+    open_pnl = led["position"]["mark"]["pnl_rs"] if led.get("position") else 0.0
+    equity = CAPITAL + led["realised_rs"] + open_pnl
+    led.update(equity=round(equity, 2), return_pct=round(100 * (equity / CAPITAL - 1), 2), open_pnl_rs=round(open_pnl, 2))
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(led, indent=2))
+    tmp.replace(path)
+    return {"order": order, "day": str(day), "open": round(float(open_px), 2), "message": what}
+
+
 NEWS_VETO_LEVEL = "high"
 
 

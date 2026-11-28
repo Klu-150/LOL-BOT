@@ -21,7 +21,7 @@ import traceback
 
 from data import ROOT
 from exchange_calendar import HOLIDAYS, REVIEWED_YEARS
-from pro import alerts, assistant, daily, live, trial
+from pro import alerts, assistant, daily, live, options_paper, trial
 from pro.constituents import IndexBoard
 from pro.market import MarketDesk, ZONE
 from pro.news import NewsDesk
@@ -129,7 +129,7 @@ class Engine:
     def monitor(self, now=None):
         now = now or datetime.now(ZONE)
         mkt, plan = self.market.snapshot(), _read_json(live.PLAN) or {}
-        opt = _read_json(daily.OPTIONS_LEDGER) or {}
+        opt = self.live_options(_read_json(daily.OPTIONS_LEDGER)) or {}
         in_session = bool((mkt.get("session") or {}).get("feed_window"))
         if in_session and self.health["market_failures"] >= 3:
             self.alerts.raise_alert("market_feed", "error", "Market data feed failing",
@@ -141,9 +141,10 @@ class Engine:
                                     f"Nifty {nifty:,.0f} is below the stop {stop:,.0f}. The bot will close the spread "
                                     "at the next open after today's 15:20 decision.", 120)
         pos = opt.get("position")
-        if pos and pos.get("mark") and pos["mark"]["pnl_rs"] <= -0.5 * pos["max_loss_rs"]:
+        mark = pos and (pos.get("live_mark") or pos.get("mark"))
+        if mark and mark["pnl_rs"] <= -0.5 * pos["max_loss_rs"]:
             self.alerts.raise_alert("spread_loss", "warning", "Spread loss above half of max loss",
-                                    f"{pos['label']}: P&L ₹{pos['mark']['pnl_rs']:,.0f} of max ₹{pos['max_loss_rs']:,.0f}.", 240)
+                                    f"{pos['label']}: P&L ₹{mark['pnl_rs']:,.0f} of max ₹{pos['max_loss_rs']:,.0f}.", 240)
         risk = (self.news.snapshot().get("risk") or {})
         if risk.get("level") == "high":
             self.alerts.raise_alert("news_risk", "warning", "High market news risk",
@@ -162,6 +163,56 @@ class Engine:
         if not assistant.configured():
             self.alerts.raise_alert("assistant_key", "info", "AI assistant in basic mode",
                                     "Set ANTHROPIC_API_KEY (or run `ant auth login`) to enable the Claude-powered assistant.", 7 * 24 * 60)
+
+    def _due_open_fill(self, now):
+        stamp = now.strftime("%H:%M")
+        trading = now.weekday() < 5 and now.date().isoformat() not in HOLIDAYS
+        return (trading and "09:20" <= stamp < DAILY_RUN_TIME
+                and self.health.get("open_fill_day") != now.date().isoformat())
+
+    def fill_at_open(self, now):
+        """Fill a pending order at today's open once the session has a confirmed opening price."""
+        nifty = (self.market.snapshot().get("nifty") or {})
+        if nifty.get("as_of") != now.date().isoformat() or not nifty.get("open"):
+            return None  # today's open not available yet; retry on the next tick
+        if not self._job_lock.acquire(blocking=False):
+            return None
+        try:
+            fill = daily.fill_pending_at_open(nifty["open"], now.date())
+            self.health["open_fill_day"] = now.date().isoformat()
+            if fill:
+                self.health["last_open_fill"] = fill
+                self.alerts.raise_alert(f"fill_{fill['day']}_{fill['order']}", "trade", "Paper trade filled at the open",
+                                        f"{fill['message']} (Nifty open {fill['open']:,.2f}).", cooldown_minutes=1)
+            return fill
+        except Exception as exc:
+            log.error("open fill failed: %s", traceback.format_exc())
+            self.alerts.raise_alert("open_fill_failed", "error", "Morning fill failed",
+                                    f"The pending paper order could not be filled at the open: {exc}. "
+                                    "It will be filled by the 15:20 run instead.", 120)
+            self.health["open_fill_day"] = now.date().isoformat()
+            return None
+        finally:
+            self._job_lock.release()
+
+    def live_options(self, options):
+        """Mark the open spread to the latest Nifty and India VIX (every market refresh)."""
+        pos = (options or {}).get("position")
+        mkt = self.market.snapshot()
+        n, v = mkt.get("nifty") or {}, mkt.get("vix") or {}
+        if not pos or not n.get("price") or not v.get("price"):
+            return options
+        try:
+            day = date.fromisoformat(n["as_of"])
+            if day < date.fromisoformat(pos["opened"]):
+                return options
+            live = options_paper.mark(pos, float(n["price"]), day, float(v["price"]))
+        except Exception:
+            return options
+        live.update(updated=self.market.updated, session_open=(mkt.get("session") or {}).get("reason") == "regular_session")
+        equity = daily.CAPITAL + options.get("realised_rs", 0.0) + live["pnl_rs"]
+        return {**options, "position": {**pos, "live_mark": live},
+                "live_equity": round(equity, 2), "live_return_pct": round(100 * (equity / daily.CAPITAL - 1), 2)}
 
     def _due_daily(self, now):
         stamp = now.strftime("%H:%M")
@@ -182,6 +233,8 @@ class Engine:
                     self.refresh_board()
                 if time.monotonic() - self._last_news > 120:
                     self.refresh_news()
+                if self._due_open_fill(now):
+                    self.fill_at_open(now)
                 if self._due_daily(now):
                     threading.Thread(target=self.run_daily, args=(True,), daemon=True).start()
                 self.monitor(now)
@@ -194,7 +247,7 @@ class Engine:
     def state(self, include_items=True):
         news = self.news.snapshot()
         alerts_list = self.alerts.list()
-        options = _read_json(daily.OPTIONS_LEDGER)
+        options = self.live_options(_read_json(daily.OPTIONS_LEDGER))
         backtest = _read_json(ROOT / "results" / "pro" / "results.json")
         return {"now": datetime.now(ZONE).isoformat(), "mode": "paper", "orders_submitted": False,
                 "plan": _read_json(live.PLAN), "options_account": options,

@@ -20,7 +20,7 @@ def _quote(symbol):
     last, prev = bars.iloc[-1], bars.iloc[-2]
     return {"symbol": symbol, "price": round(float(last.Close), 2), "prev_close": round(float(prev.Close), 2),
             "change_pct": round(100 * (float(last.Close) / float(prev.Close) - 1), 2),
-            "high": round(float(last.High), 2), "low": round(float(last.Low), 2),
+            "open": round(float(last.Open), 2), "high": round(float(last.High), 2), "low": round(float(last.Low), 2),
             "as_of": str(bars.index[-1].tz_convert(ZONE).date())}
 
 

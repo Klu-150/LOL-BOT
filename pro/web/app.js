@@ -148,12 +148,14 @@ function renderOverview(st) {
   const now = new Date(st.now), weekday = now.getDay() % 6 !== 0;
   $("nextRun").textContent = weekday && now.getHours() * 60 + now.getMinutes() < 920 ? "Today 15:20 IST" : "Next trading day 15:20";
 
-  $("kEquity").textContent = inr(opt.equity);
-  $("kEquitySub").textContent = opt.return_pct != null ? `${pct(opt.return_pct)} since ${opt.started || "start"}` : "Starts on the first run";
-  $("kEquitySub").className = sign(opt.return_pct);
-  const m = opt.position?.mark;
-  $("kOpen").textContent = m ? inr(m.pnl_rs) : "No position"; $("kOpen").className = m ? sign(m.pnl_rs) : "";
-  $("kOpenSub").textContent = opt.position ? `max loss ${inr(opt.position.max_loss_rs)}` : "";
+  const liveM = opt.position?.live_mark, m = liveM || opt.position?.mark;
+  const eq = opt.live_equity ?? opt.equity, ret = opt.live_return_pct ?? opt.return_pct;
+  $("kEquity").textContent = inr(eq);
+  $("kEquitySub").textContent = ret != null ? `${pct(ret)} since ${opt.started || "start"}${liveM ? " · live" : ""}` : "Starts on the first run";
+  $("kEquitySub").className = sign(ret);
+  $("kOpen").textContent = m ? inr(m.pnl_rs) : opt.pending === "OPEN" ? "Opening at next open" : "No position";
+  $("kOpen").className = m ? sign(m.pnl_rs) : "";
+  $("kOpenSub").textContent = opt.position ? `${liveM?.session_open ? "live · " : ""}max loss ${inr(opt.position.max_loss_rs)}` : "";
   const n = mkt.nifty || {}, v = mkt.vix || {};
   $("kNifty").textContent = num(n.price); $("kNiftySub").textContent = `${pct(n.change_pct)} · ${n.as_of || ""}`; $("kNiftySub").className = sign(n.change_pct);
   $("kVix").textContent = num(v.price); $("kVixSub").textContent = pct(v.change_pct) + (v.price >= 25 ? " · stress" : v.price < 14 ? " · calm" : " · normal");
@@ -175,14 +177,19 @@ function renderOverview(st) {
   if (!pos) {
     fill($("positionBody"), el("p", { class: "empty-state", text: opt.pending === "OPEN" ? "A bull put spread will open at the next market open." : "No open spread. The bot opens one only when the trend playbook gives a long signal." }));
   } else {
-    const mk = pos.mark || {}, lo = -pos.max_loss_rs, hi = pos.credit_pts * 65 * pos.lots;
+    const mk = pos.live_mark || pos.mark || {}, lo = -pos.max_loss_rs, hi = pos.credit_pts * 65 * pos.lots;
+    const markNote = pos.live_mark
+      ? (pos.live_mark.session_open ? `Live · Nifty ${num(mk.spot, 0)}, VIX ${num(mk.vix)} · updated ${new Date(pos.live_mark.updated).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`
+        : `Market closed · valued at last Nifty ${num(mk.spot, 0)} and VIX ${num(mk.vix)}`)
+      : `Valued at the ${mk.as_of || "last"} close`;
     const at = Math.max(0, Math.min(100, ((mk.pnl_rs - lo) / (hi - lo)) * 100));
     fill($("positionBody"),
       el("strong", { text: pos.label }),
+      el("div", { class: "small " + (pos.live_mark?.session_open ? "live" : "muted"), text: markNote }),
       el("div", { class: "position-grid" },
         el("div", {}, el("span", { text: "Credit received" }), el("b", { text: `${num(pos.credit_pts)} pts · ${inr(pos.credit_pts * 65 * pos.lots)}` })),
         el("div", {}, el("span", { text: "Current P&L" }), el("b", { class: sign(mk.pnl_rs), text: inr(mk.pnl_rs) })),
-        el("div", {}, el("span", { text: "Opened" }), el("b", { text: `${pos.opened} at Nifty ${num(pos.spot_at_entry, 0)}` })),
+        el("div", {}, el("span", { text: "Opened" }), el("b", { text: `${pos.opened} at Nifty ${num(pos.spot_at_entry, 0)}${pos.filled_live ? " (at the open)" : ""}` })),
         el("div", {}, el("span", { text: "Days to expiry" }), el("b", { text: `${mk.days_to_expiry ?? "—"} (rolls at 7)` })),
         el("div", {}, el("span", { text: "Safe while Nifty stays above" }), el("b", { text: num(pos.legs[0].K, 0) })),
         el("div", {}, el("span", { text: "Engine stop (index)" }), el("b", { text: stop ? num(stop, 0) : "—" }))),
