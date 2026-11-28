@@ -109,6 +109,26 @@ Instrument:                              (index ETF / futures / option spread)
 Risk per trade:                          (1-2% of equity)
 ```
 
-Good ideas to try next: a 15-minute opening-range breakout used only on
-`uptrend` days, a volatility-premium iron condor *held several days* when VIX rank>60
-and regime is `range`, and a sector-rotation version across Bank Nifty/IT indices.
+## 7. Ideas tested after the first build (28 Nov 2026)
+
+Each used textbook parameters fixed before testing, with costs, split into two eras.
+
+| Idea | Result | Decision |
+|---|---|---|
+| Iron condor held ~2 weeks in `range`, VIX rank ≥ 50 (`pro/premium.py`) | 25 trades, PF 1.04, lost 2016–22, won 2023–26 | Rejected: no stable edge |
+| Same condor without the VIX filter | 136 trades, PF 0.53, −₹91k per lot | Rejected |
+| Sector momentum rotation, top 3 of 12 NSE indices above their 200-day average, monthly | 10.6%/yr vs Nifty 11.6%, worst drop −41% vs −38% | Rejected: worse than holding Nifty |
+| 15-minute opening-range breakout in the daily trend direction | +607 pts over 32 trades, but only ~60 days of data and mostly shorts | Not enabled: sample too small. The daily job archives 5-minute bars to `data/intraday_archive.csv`; re-test after 1–2 years |
+
+The daily engine in sections 4–5 is the only design that passed. Ideas worth testing
+next: dividend-inclusive total-return data, a 50% core holding + 50% adaptive split,
+and the opening-range breakout once the intraday archive is long enough.
+
+## 8. Running it unattended
+
+`python -m pro.daily --include-today` (after 15:10 IST) archives intraday bars,
+writes the plan and updates a forward paper account in `paper/pro_engine_ledger.json`.
+That account holds an index ETF fully while the engine is long, and earns 6%/yr in cash
+otherwise. Orders decided today fill at the next session's open.
+`sh pro/install_schedule.sh` schedules it weekdays at 15:20 on this Mac (the Mac must be
+awake); `sh pro/install_schedule.sh --remove` removes it.
